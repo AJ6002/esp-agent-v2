@@ -99,6 +99,11 @@ class ESPIntentEnum(str, Enum):
     WELL_HEALTH = "WELL_HEALTH"
     MULTI_WELL_COMPARE = "MULTI_WELL_COMPARE"
     FLEET_INVENTORY = "FLEET_INVENTORY"
+    FLEET_PRODUCTION = "FLEET_PRODUCTION"
+    FLEET_TRIAGE = "FLEET_TRIAGE"
+    FLEET_EXECUTIVE = "FLEET_EXECUTIVE"
+    FLEET_ANOMALY = "FLEET_ANOMALY"
+    FLEET_TIMELINE = "FLEET_TIMELINE"
     PRODUCTION = "PRODUCTION"
     KNOWLEDGE = "KNOWLEDGE"
     WORK_ORDER_DISPATCH = "WORK_ORDER_DISPATCH"
@@ -187,3 +192,85 @@ class DispatchWorkOrderResponse(BaseModel):
     assigned_checklist_count: int
     mandatory_loto_enforced: bool
     message: str
+
+
+# =========================================================================
+# DOMAIN 1: FLEET ANALYSIS EXPANDED SCHEMAS
+# =========================================================================
+
+class FleetProductionSummary(BaseModel):
+    total_wells: int
+    running_wells_count: int
+    tripped_wells_count: int
+    availability_factor_pct: float
+    current_liquid_rate_bpd: float
+    current_net_oil_bpd: float
+    average_water_cut_pct: float
+    deferred_liquid_rate_bpd: float
+    deferred_net_oil_bpd: float
+    fleet_production_efficiency_pct: float
+    cluster_production_breakdown: list[dict[str, Any]] = []
+    markdown_report: str
+
+
+class TriageWellItem(BaseModel):
+    rank: int
+    well_id: str
+    operating_state: str
+    severity: str
+    dominant_issue: str
+    peak_vibration_g: float | None = None
+    motor_current_a: float | None = None
+    deferred_oil_bpd: float = 0.0
+    recommended_urgency: str
+
+
+class FleetTriageReport(BaseModel):
+    total_assets_triaged: int
+    critical_count: int
+    warning_count: int
+    triaged_wells: list[TriageWellItem] = []
+    markdown_report: str
+
+
+class FleetExecutiveReport(BaseModel):
+    generated_at: str
+    fleet_availability_pct: float
+    online_wells_ratio: str
+    current_bopd: float
+    deferred_bopd: float
+    top_deferment_asset: str
+    fleet_health_index_avg: float
+    supervisory_mandates: list[str] = []
+    markdown_report: str
+
+
+class AnomalyWellItem(BaseModel):
+    well_id: str
+    anomaly_category: str
+    current_val: float
+    baseline_p50: float
+    threshold_p90: float
+    deviation_pct: float
+
+
+class FleetAnomalyReport(BaseModel):
+    running_wells_audited: int
+    anomalous_running_count: int
+    anomalies: list[AnomalyWellItem] = []
+    markdown_report: str
+
+
+class AlarmTimeBucket(BaseModel):
+    time_bucket: str
+    trip_count: int
+    dominant_cause: str
+
+
+class FleetAlarmTimelineReport(BaseModel):
+    time_window_days: int
+    total_trip_events: int
+    dominant_fleet_trip_cause: str
+    cluster_clustering: dict[str, int] = {}
+    daily_density: list[AlarmTimeBucket] = []
+    markdown_report: str

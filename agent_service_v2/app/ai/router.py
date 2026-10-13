@@ -13,7 +13,12 @@ from app.schemas.esp_diagnosis import (
 from app.services.esp_diagnosis_service import (
     compare_multiple_wells,
     diagnose_esp_event,
+    get_fleet_alarm_timeline,
+    get_fleet_anomaly_surfacing,
+    get_fleet_executive_report,
     get_fleet_inventory_status,
+    get_fleet_production_summary,
+    get_fleet_triage_ranking,
     get_well_health_status,
     get_well_historical_analysis,
     get_well_production_metrics,
@@ -140,6 +145,66 @@ def ask_agent(
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["FNW-001 Health", "FS-017 History", "Cluster 15", "Cluster 4"],
+        }
+
+    # 4.1 Fleet Production & Deferment Summary (Domain 1.3)
+    if route.intent == ESPIntentEnum.FLEET_PRODUCTION:
+        prod_res = get_fleet_production_summary()
+        return {
+            "intent": "FLEET_PRODUCTION",
+            "markdown_text": prod_res.markdown_report,
+            "structured_data": prod_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Fleet Triage", "Executive Summary", "Fleet Anomalies", "Fleet Status"],
+        }
+
+    # 4.2 Fleet Triage & Priority Ranking (Domain 1.4)
+    if route.intent == ESPIntentEnum.FLEET_TRIAGE:
+        triage_res = get_fleet_triage_ranking()
+        return {
+            "intent": "FLEET_TRIAGE",
+            "markdown_text": triage_res.markdown_report,
+            "structured_data": triage_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Executive Summary", "Fleet Production", "Diagnose FNW-001", "Fleet Status"],
+        }
+
+    # 4.3 Fleet Executive Briefing & KPI Reporting (Domain 1.5)
+    if route.intent == ESPIntentEnum.FLEET_EXECUTIVE:
+        exec_res = get_fleet_executive_report()
+        return {
+            "intent": "FLEET_EXECUTIVE",
+            "markdown_text": exec_res.markdown_report,
+            "structured_data": exec_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Fleet Triage", "Fleet Production", "Fleet Anomalies", "Fleet Status"],
+        }
+
+    # 4.4 Fleet Anomaly Surfacing & Early Warning (Domain 1.6)
+    if route.intent == ESPIntentEnum.FLEET_ANOMALY:
+        anomaly_res = get_fleet_anomaly_surfacing()
+        return {
+            "intent": "FLEET_ANOMALY",
+            "markdown_text": anomaly_res.markdown_report,
+            "structured_data": anomaly_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Fleet Status", "Fleet Triage", "Executive Summary"],
+        }
+
+    # 4.5 Fleet Alarm Timeline & Incident Clustering (Domain 1.7)
+    if route.intent == ESPIntentEnum.FLEET_TIMELINE:
+        timeline_res = get_fleet_alarm_timeline()
+        return {
+            "intent": "FLEET_TIMELINE",
+            "markdown_text": timeline_res.markdown_report,
+            "structured_data": timeline_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Fleet Triage", "Executive Summary", "Fleet Status"],
         }
 
     # 5. Multi-Well Comparison

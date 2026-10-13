@@ -511,6 +511,11 @@ def ask(
         get_well_historical_analysis,
         get_well_health_status,
         get_fleet_inventory_status,
+        get_fleet_production_summary,
+        get_fleet_triage_ranking,
+        get_fleet_executive_report,
+        get_fleet_anomaly_surfacing,
+        get_fleet_alarm_timeline,
         get_well_production_metrics,
         search_petroleum_kb,
         compare_multiple_wells,
@@ -878,6 +883,156 @@ def ask(
             )
         except Exception as e:
             logger.warning(f"Fleet inventory dispatch failed: {e}")
+
+    # 6.1 Fleet Production & Deferment Summary (Domain 1.3)
+    if route.intent == ESPIntentEnum.FLEET_PRODUCTION:
+        try:
+            prod_res = get_fleet_production_summary()
+            citations = [
+                Citation(
+                    source_type="postgresql_telemetry",
+                    source_id=1,
+                    title="Live Fleet Production & Deferment Audit",
+                    excerpt=f"Active Oil: {prod_res.current_net_oil_bpd:.1f} BOPD, Deferred Loss: {prod_res.deferred_net_oil_bpd:.1f} BOPD across {prod_res.total_wells} wells",
+                    relevance_score=0.99,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_production_ask", question, prod_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=prod_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[f"Fleet Deferment: {prod_res.deferred_net_oil_bpd:.1f} BOPD currently shut in across {prod_res.tripped_wells_count} offline wells."],
+                needs_clarification=False,
+                suggested_options=["Fleet Triage Ranking", "Executive Summary", "Fleet Anomalies", "Fleet Status"],
+                is_mock=False,
+                structured_data=prod_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet production dispatch failed: {e}")
+
+    # 6.2 Fleet Triage & Priority Ranking (Domain 1.4)
+    if route.intent == ESPIntentEnum.FLEET_TRIAGE:
+        try:
+            triage_res = get_fleet_triage_ranking()
+            citations = [
+                Citation(
+                    source_type="postgresql_events",
+                    source_id=1,
+                    title="Fleet Maintenance Triage Matrix",
+                    excerpt=f"Triaged {triage_res.total_assets_triaged} offline assets: {triage_res.critical_count} Critical, {triage_res.warning_count} Warning",
+                    relevance_score=0.99,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_triage_ask", question, triage_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=triage_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[f"Action Priority: {triage_res.critical_count} critical tripped wells require Immediate LOTO and root-cause clearance."],
+                needs_clarification=False,
+                suggested_options=["Executive Summary", "Fleet Production Summary", "Diagnose FNW-001", "Fleet Status"],
+                is_mock=False,
+                structured_data=triage_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet triage dispatch failed: {e}")
+
+    # 6.3 Fleet Executive Briefing & KPI Reporting (Domain 1.5)
+    if route.intent == ESPIntentEnum.FLEET_EXECUTIVE:
+        try:
+            exec_res = get_fleet_executive_report()
+            citations = [
+                Citation(
+                    source_type="postgresql_executive_rollup",
+                    source_id=1,
+                    title="Executive Operations KPI Scorecard",
+                    excerpt=f"Fleet Availability: {exec_res.fleet_availability_pct}% | Active Oil: {exec_res.current_bopd:.1f} BOPD",
+                    relevance_score=0.99,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_executive_ask", question, exec_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=exec_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Fleet Triage Ranking", "Fleet Production Summary", "Fleet Anomalies", "Fleet Status"],
+                is_mock=False,
+                structured_data=exec_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet executive dispatch failed: {e}")
+
+    # 6.4 Fleet Anomaly Surfacing & Early Warning (Domain 1.6)
+    if route.intent == ESPIntentEnum.FLEET_ANOMALY:
+        try:
+            anomaly_res = get_fleet_anomaly_surfacing()
+            citations = [
+                Citation(
+                    source_type="postgresql_telemetry_envelope",
+                    source_id=1,
+                    title="Fleet Sensor Drift & Anomaly Surveillance",
+                    excerpt=f"Audited {anomaly_res.running_wells_audited} running assets: {anomaly_res.anomalous_running_count} sub-trip deviations detected",
+                    relevance_score=0.98,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_anomaly_ask", question, anomaly_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=anomaly_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[f"Early Warning: {anomaly_res.anomalous_running_count} running wells displaying continuous baseline drift."],
+                needs_clarification=False,
+                suggested_options=["Fleet Status", "Fleet Triage Ranking", "Executive Summary"],
+                is_mock=False,
+                structured_data=anomaly_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet anomaly dispatch failed: {e}")
+
+    # 6.5 Fleet Alarm Timeline & Incident Clustering (Domain 1.7)
+    if route.intent == ESPIntentEnum.FLEET_TIMELINE:
+        try:
+            timeline_res = get_fleet_alarm_timeline()
+            citations = [
+                Citation(
+                    source_type="postgresql_events_density",
+                    source_id=1,
+                    title="Fleet Trip Event Frequency & Clustering",
+                    excerpt=f"Historical total trips: {timeline_res.total_trip_events} | Dominant cause: {timeline_res.dominant_fleet_trip_cause}",
+                    relevance_score=0.98,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_timeline_ask", question, timeline_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=timeline_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Fleet Triage Ranking", "Executive Summary", "Fleet Status"],
+                is_mock=False,
+                structured_data=timeline_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet timeline dispatch failed: {e}")
 
     # 7. Production Telemetry
     if route.intent == ESPIntentEnum.PRODUCTION and route.entity:
