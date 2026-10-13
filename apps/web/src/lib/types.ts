@@ -1,0 +1,704 @@
+export type Role = 'admin' | 'supervisor' | 'technician';
+export type WorkOrderStatus = 'pending_dispatch' | 'assigned' | 'accepted' | 'in_progress' | 'pending_acceptance' | 'completed' | 'cancelled' | 'returned' | 'paused';
+export type Priority = 'P1' | 'P2' | 'P3' | 'P4';
+export type LogType = 'inspect' | 'diagnose' | 'repair' | 'replace' | 'test' | 'note';
+export type EquipmentStatus = 'running' | 'idle' | 'warning' | 'fault' | 'maintenance' | 'offline' | 'under_repair' | 'stopped' | 'scrapped';
+export type Urgency = 'low' | 'medium' | 'high' | 'critical';
+export type FaultReportStatus = 'pending' | 'converted' | 'closed';
+
+export interface User {
+  id: number; email: string; full_name: string; phone?: string; role: Role; is_active: boolean;
+}
+
+export interface AuthState {
+  token: string | null; user: User | null; role: Role | null;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  loading: boolean;
+}
+
+export interface ApiErrorBody {
+  code?: string;
+  message?: string;
+  work_order_id?: number;
+  missing_requirements?: string[];
+}
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  workOrderId?: number;
+
+  constructor(status: number, body: ApiErrorBody | string) {
+    const msg = typeof body === 'string' ? body : (body.message || `HTTP ${status}`);
+    super(msg);
+    this.name = 'ApiError';
+    this.status = status;
+    if (typeof body !== 'string') {
+      this.code = body.code;
+      this.workOrderId = body.work_order_id;
+    }
+  }
+}
+
+export interface ConvertToWorkOrderRequest {
+  assignee_id?: number;
+  priority?: Priority;
+  planned_start_at?: string;
+  planned_end_at?: string;
+  notes?: string;
+}
+
+export interface ConvertToWorkOrderResponse {
+  fault_report_id: number;
+  work_order_id: number;
+  work_order_code: string;
+  priority: string;
+  status: string;
+}
+
+export const STATUS_LABELS: Record<string, string> = {
+  pending_dispatch: 'Pending Dispatch', assigned: 'Assigned', accepted: 'Accepted', in_progress: 'In Progress',
+  pending_acceptance: 'Pending Review', completed: 'Completed', cancelled: 'Cancelled', returned: 'Returned', paused: 'Paused',
+};
+export const PRIORITY_LABELS: Record<string, string> = {
+  P1: 'P1 Critical', P2: 'P2 High', P3: 'P3 Medium', P4: 'P4 Low',
+};
+export const LOG_TYPE_LABELS: Record<string, string> = {
+  inspect: 'Inspection', diagnose: 'Diagnosis', repair: 'Repair', replace: 'Replacement', test: 'Testing', note: 'Note',
+};
+export const URGENCY_LABELS: Record<string, string> = {
+  low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical',
+};
+export const FAULT_REPORT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending', converted: 'Converted to Work Order', closed: 'Closed',
+};
+
+export const KNOWLEDGE_CATEGORY_LABELS: Record<string, string> = {
+  manual: 'Manual', sop: 'SOP', safety: 'Safety Protocol', case: 'Case Study',
+  fault_code: 'Fault Code', experience: 'Maintenance Notes',
+};
+
+export const CHECKLIST_CATEGORY_LABELS: Record<string, string> = {
+  safety: 'Safety Inspection',
+  diagnosis: 'Fault Diagnosis',
+  repair: 'Repair Execution',
+  testing: 'Functional Testing',
+};
+
+export interface Citation {
+  source_type: string;
+  source_id: number;
+  title: string;
+  excerpt?: string;
+  relevance_score: number;
+  url?: string;
+}
+
+export interface AskResult {
+  answer: string;
+  confidence: number;
+  citations: Citation[];
+  warnings: string[];
+  needs_clarification?: boolean;
+  clarification_question?: string | null;
+  suggested_options?: string[];
+  is_mock: boolean;
+  disclaimer: string;
+}
+
+// ---- Work Order types ----
+
+export interface ChecklistItem {
+  id: number;
+  work_order_id: number;
+  category: string;
+  content: string;
+  order: number;
+  is_required: boolean;
+  is_completed: boolean;
+  remark?: string;
+  completed_at?: string;
+  completed_by?: number;
+}
+
+export interface MaintenanceLog {
+  id: number;
+  work_order_id: number;
+  log_type: LogType;
+  content: string;
+  raw_content?: string;
+  ai_polished?: string;
+  photos?: string[];
+  operator_id?: number;
+  operator_name?: string;
+  logged_at?: string;
+  created_at?: string;
+}
+
+export interface LaborEntry {
+  id: number;
+  work_order_id: number;
+  started_at?: string;
+  ended_at?: string;
+  hours: number;
+  is_downtime: boolean;
+  operator_id?: number;
+  operator_name?: string;
+  remark?: string;
+}
+
+export interface SparePartUsage {
+  id: number;
+  work_order_id: number;
+  spare_part_id?: number;
+  spare_part_code?: string;
+  spare_part_name?: string;
+  quantity: number;
+  unit: string;
+  remark?: string;
+}
+
+export interface StatusHistoryEntry {
+  id: number;
+  from_status?: string;
+  to_status: string;
+  changed_by?: number;
+  changed_at?: string;
+  remark?: string;
+}
+
+export interface WorkOrder {
+  id: number;
+  code: string;
+  title: string;
+  equipment_id?: number;
+  equipment_name?: string;
+  equipment_code?: string;
+  fault_report_id?: number;
+  fault_description?: string;
+  fault_code_id?: number;
+  fault_code?: string;
+  order_type: string;
+  priority: Priority;
+  status: WorkOrderStatus;
+  created_by_id?: number;
+  creator_name?: string;
+  assignee_id?: number;
+  assignee_name?: string;
+  planned_start_at?: string;
+  planned_end_at?: string;
+  actual_start_at?: string;
+  actual_end_at?: string;
+  safety_risk?: string;
+  requires_safety_confirmation?: boolean;
+  ai_diagnosis_summary?: string;
+  maintenance_steps?: unknown[];
+  acceptance_criteria?: string;
+  root_cause?: string;
+  action_taken?: string;
+  replaced_parts?: string;
+  test_result?: string;
+  equipment_status_after?: string;
+  follow_up_advice?: string;
+  needs_observation: boolean;
+  completion_photos?: string[];
+  rejection_reason?: string;
+  submitted_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  checklist_items: ChecklistItem[];
+  logs: MaintenanceLog[];
+  labor_entries: LaborEntry[];
+  spare_parts: SparePartUsage[];
+  status_history: StatusHistoryEntry[];
+}
+
+export interface CompletionValidationError {
+  code: string;
+  message: string;
+  missing_requirements: string[];
+}
+
+export interface ReportSection {
+  title: string;
+  content: string;
+}
+
+export interface WorkOrderReport {
+  work_order_id: number;
+  work_order_code: string;
+  summary: string;
+  sections: ReportSection[];
+  generation_method: string;
+  version: number;
+  is_mock: boolean;
+}
+
+export type SimulationScenario =
+  | 'normal'
+  | 'temperature_rise'
+  | 'vibration_spike'
+  | 'current_overload'
+  | 'bearing_wear'
+  | 'voltage_fluctuation'
+  | 'sensor_disconnect'
+  | 'composite_anomaly';
+
+export interface TelemetryRecord {
+  id: number;
+  equipment_id: number;
+  collected_at: string;
+  vibration_rms?: number;
+  bearing_temperature?: number;
+  motor_current?: number;
+  motor_voltage?: number;
+  rotational_speed?: number;
+  load_ratio?: number;
+  ambient_temperature?: number;
+  cumulative_runtime_hours: number;
+  scenario: SimulationScenario;
+  quality: number;
+  is_anomaly: boolean;
+  anomaly_metrics?: string[];
+}
+
+export interface SimulatorStatus {
+  running: boolean;
+  interval_seconds: number;
+  scenario: SimulationScenario;
+  seed: number;
+  equipment_ids: number[];
+  generated_points: number;
+  auto_create_work_orders: boolean;
+}
+
+export interface MLModelVersion {
+  id: number;
+  name: string;
+  task_type: 'failure_risk' | 'fault_classification' | 'rul';
+  algorithm: string;
+  version: string;
+  dataset_version_id: number;
+  training_run_id: number;
+  feature_schema_version: string;
+  git_commit_sha: string;
+  artifact_sha256: string;
+  status: 'registered' | 'candidate' | 'staging' | 'production' | 'archived';
+  is_production: boolean;
+  created_at: string;
+}
+
+export interface MLFeatureContribution {
+  name: string;
+  contribution: number;
+}
+
+export interface MLPredictionRecord {
+  id: number;
+  equipment_id: number;
+  model_version_id: number;
+  prediction_type: 'failure_risk' | 'fault_classification' | 'rul';
+  prediction: string;
+  prediction_value?: number;
+  probability?: number;
+  confidence: number;
+  prediction_horizon?: string;
+  rul_hours?: number;
+  degradation_index?: number;
+  feature_timestamp_start: string;
+  feature_timestamp_end: string;
+  feature_schema_version: string;
+  probabilities?: Record<string, number>;
+  top_contributing_features?: MLFeatureContribution[];
+  created_at: string;
+}
+
+// ============ Industrial Gateway (OPC UA, read-only) ============
+
+export interface GatewayConnectionInfo {
+  id: number;
+  name: string;
+  protocol: string;
+  endpoint: string;
+  mode: string;
+  status: 'disconnected' | 'connected' | 'error';
+  enabled: boolean;
+  poll_interval_seconds: number;
+  last_connected_at: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+}
+
+export interface GatewayRuntimeInfo {
+  mode: string;
+  endpoint: string;
+  connected: boolean;
+  connection_status: string;
+  running: boolean;
+  poll_interval_seconds: number;
+  auto_ingest: boolean;
+  read_only: boolean;
+  last_connected_at: string | null;
+  last_sync_at: string | null;
+  last_error: string | null;
+  consecutive_failures: number;
+  totals: {
+    reads_total: number;
+    accepted: number;
+    rejected: number;
+    snapshots_ingested: number;
+    snapshots_skipped: number;
+    anomalies: number;
+    work_orders_created: number;
+  };
+  last_sync: Record<string, unknown> | null;
+}
+
+export interface GatewayStatus {
+  connection: GatewayConnectionInfo | null;
+  runtime: GatewayRuntimeInfo;
+  enabled: boolean;
+  read_only: boolean;
+  seed_error: string | null;
+}
+
+export interface GatewayNode {
+  node_id: string;
+  equipment_code: string | null;
+  metric_name: string;
+  unit: string;
+  enabled: boolean;
+  informational: boolean;
+  last_value: number | boolean | string | null;
+  last_quality: 'good' | 'uncertain' | 'bad' | null;
+  last_timestamp: string | null;
+  last_error: string | null;
+}
+
+export interface GatewayNodes {
+  nodes: GatewayNode[];
+  read_only: boolean;
+}
+
+export interface GatewayTestConnect {
+  ok: boolean;
+  endpoint: string;
+  latency_ms: number;
+  probe_node: string | null;
+  sample_value: number | boolean | string | null;
+  error: string | null;
+}
+
+export interface GatewaySyncResult {
+  ok: boolean;
+  error: string | null;
+  reads_total: number;
+  accepted: number;
+  rejected: number;
+  corrections: number;
+  reject_reasons: Record<string, number>;
+  snapshots_ingested: number;
+  snapshots_skipped: number;
+  anomalies: number;
+  work_orders_created: number;
+  telemetry_ids: number[];
+  skipped_details: string[];
+  duration_ms: number;
+}
+
+// ============ OPC UA DataChange Subscription ============
+
+export interface GatewaySubscriptionRow {
+  id: number;
+  gateway_id: number;
+  node_id: string;
+  sampling_interval: number;
+  status: string;
+  last_event_at: string | null;
+  event_count: number;
+}
+
+export interface GatewaySubscriptionStatus {
+  ok: boolean;
+  status: string;
+  subscription_status: string;
+  sampling_interval_ms: number;
+  active_nodes: string[];
+  buffer_pending: number;
+  event_totals: Record<string, number>;
+  last_event_at: string | null;
+  last_event: string | null;
+  error: string | null;
+  read_only: boolean;
+  rows: GatewaySubscriptionRow[];
+}
+
+export interface SubscriptionActionResult {
+  ok: boolean;
+  status: string;
+  already_active?: boolean;
+  error?: string | null;
+}
+
+// ============ Industrial Alarms ============
+
+export interface IndustrialAlarm {
+  id: number;
+  equipment_id: number;
+  severity: 'WARNING' | 'CRITICAL';
+  message: string;
+  source: string;
+  acknowledged: boolean;
+  acknowledged_at: string | null;
+  cleared_at: string | null;
+  created_at: string;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
+  analysis_status: string;
+  correlation_group_id: string | null;
+  correlated_alarm_count: number;
+}
+
+export interface IndustrialAlarmList {
+  items: IndustrialAlarm[];
+  total: number;
+  read_only_source: boolean;
+}
+
+// ============ Alarm Intelligence (AI-assisted analysis, advisory only) ============
+
+export interface AlarmAnalysis {
+  id: number;
+  alarm_id: number;
+  correlation_group_id: string | null;
+  summary: string;
+  root_cause_hypothesis: string;
+  contributing_factors: string[];
+  evidence: Record<string, unknown>;
+  citations: Array<Record<string, string | number | null | undefined>>;
+  confidence: number;
+  recommended_actions: string[];
+  suggested_priority: string;
+  related_work_order_id: number | null;
+  created_work_order_id: number | null;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  analysis_status: string;
+  review_status: 'approve' | 'reject' | 'request_more_evidence' | null;
+  reviewed_by: number | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  agent_run_id: number | null;
+  requires_human_review: boolean;
+  model_version: string;
+  is_mock: boolean;
+  created_at: string;
+}
+
+export interface AlarmWorkOrderResult {
+  alarm_id: number;
+  analysis_id: number;
+  work_order_id: number;
+  work_order_code: string;
+  status: string;
+  created: boolean;
+}
+
+export interface AlarmCorrelationGroup {
+  group_id: string;
+  reason: string;
+  alarm_ids: number[];
+  equipment_ids: number[];
+  severity: string;
+  window_start: string | null;
+  window_end: string | null;
+  size: number;
+}
+
+export interface AlarmCorrelateResult {
+  groups: AlarmCorrelationGroup[];
+  total_alarms: number;
+}
+
+// ---------------- Observability & Traceability ----------------
+
+export interface TraceTimelineEntry {
+  stage: string;
+  entity_type: string;
+  entity_id: number;
+  timestamp: string | null;
+  equipment_id: number | null;
+  status: string | null;
+  [key: string]: unknown;
+}
+
+export interface TraceDetail {
+  trace_id: string;
+  started_at: string | null;
+  finished_at: string | null;
+  duration_ms: number;
+  equipment_ids: number[];
+  final_status: string;
+  stage_count: number;
+  event_count: number;
+  timeline: TraceTimelineEntry[];
+}
+
+export interface TraceSummary {
+  trace_id: string;
+  started_at: string | null;
+  last_activity_at: string;
+  equipment_ids: number[];
+  final_status: string;
+  stage_count: number;
+  event_count: number;
+}
+
+export interface TraceSearchResult {
+  total: number;
+  limit: number;
+  offset: number;
+  items: TraceSummary[];
+}
+
+export type ComponentStatus = 'healthy' | 'degraded' | 'unavailable' | 'unknown';
+
+export interface HealthComponent {
+  status: ComponentStatus;
+  detail?: string;
+  error_type?: string;
+  [key: string]: unknown;
+}
+
+export interface ObservabilityHealth {
+  status: string;
+  checked_at: string;
+  components: Record<string, HealthComponent>;
+}
+
+export interface MetricsSummary {
+  telemetry_events: number;
+  alarms_total: number;
+  alarms_active: number;
+  work_orders_total: number;
+  work_orders_open: number;
+  analyses_waiting_review: number;
+  agent_runs_total: number;
+  agent_avg_latency_ms: number | null;
+  traces_tracked: number;
+}
+// ---------------- Portfolio Demo Workspace ----------------
+
+export interface DemoTelemetry {
+  id: number;
+  collected_at: string | null;
+  bearing_temperature: number | null;
+  vibration_rms: number | null;
+  motor_current_a: number | null;
+  motor_voltage_v: number | null;
+  speed_rpm: number | null;
+  load_ratio_pct: number | null;
+  quality: number;
+  is_anomaly: boolean;
+  trace_id: string | null;
+}
+
+export interface DemoEquipment {
+  id: number;
+  code: string;
+  name: string;
+  status: string | null;
+  health_score: number | null;
+  risk_level: string | null;
+}
+
+export interface DemoAlarm {
+  id: number;
+  severity: string;
+  message: string;
+  source: string;
+  acknowledged: boolean;
+  cleared: boolean;
+  created_at: string | null;
+  trace_id: string | null;
+}
+
+export interface DemoPrediction {
+  id: number;
+  model_version: string;
+  failure_mode: string;
+  probability: number | null;
+  remaining_useful_life_hours: number | null;
+  is_mock: boolean;
+  created_at: string | null;
+}
+
+export interface DemoAnalysis {
+  id: number;
+  alarm_id: number;
+  analysis_status: string;
+  review_status: string | null;
+  confidence: number;
+  risk_level: string;
+  root_cause_hypothesis: string;
+  recommended_actions: string[];
+  citations: Array<Record<string, unknown>>;
+  model_version: string;
+  requires_human_review: boolean;
+  created_work_order_id: number | null;
+}
+
+export interface DemoWorkOrder {
+  id: number;
+  code: string;
+  title: string;
+  status: string | null;
+  priority: string | null;
+  assignee_id: number | null;
+  trace_id: string | null;
+}
+
+export interface DemoState {
+  equipment: DemoEquipment | null;
+  simulator: { available: boolean; scenario: string | null; tick: number | null };
+  gateway: { enabled: boolean; mode: string; status: string | null; last_sync_at: string | null };
+  telemetry: DemoTelemetry | null;
+  quality: {
+    accepted: number | null;
+    rejected: number | null;
+    reject_reasons: Record<string, number>;
+    corrections: number | null;
+    snapshots_ingested: number | null;
+  } | null;
+  anomaly: {
+    id: number;
+    fault_type: string;
+    title: string;
+    severity: string | null;
+    status: string;
+    confidence: number;
+    detected_at: string | null;
+    trace_id: string | null;
+  } | null;
+  prediction: DemoPrediction | null;
+  recommendation: {
+    id: number;
+    title: string;
+    strategy: string;
+    priority: string;
+    auto_work_order_id: number | null;
+  } | null;
+  alarm: DemoAlarm | null;
+  analysis: DemoAnalysis | null;
+  work_order: DemoWorkOrder | null;
+  approval: {
+    id: number;
+    command_type: string;
+    risk_level: string | null;
+    status: string;
+  } | null;
+  agent_run: { id: number; goal: string; status: string; provider: string } | null;
+  trace_id: string | null;
+}

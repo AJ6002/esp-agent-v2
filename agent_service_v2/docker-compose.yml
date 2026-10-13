@@ -1,0 +1,26 @@
+version: "3.8"
+
+networks:
+  esp-agent-net:
+    driver: bridge
+
+services:
+  agent-service-v2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: esp-agent-service-v2:latest
+    container_name: esp-agent-service-v2
+    restart: unless-stopped
+    ports:
+      - "8092:8092"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8092
+      - ESP_APM_DB_URL=postgresql://esp_admin:EspApm2026!@192.168.1.184:5433/esp_apm_db
+      - AI_ENABLED=true
+      - LLM_API_BASE=http://192.168.1.134:8080/v1
+      - LLM_MODEL=Qwen2.5-Coder-3B-Instruct-Q4_K_M
+      - LLM_TIMEOUT=60
+    networks:
+      - esp-agent-net

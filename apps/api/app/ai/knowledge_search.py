@@ -1,0 +1,125 @@
+"""Knowledge search: keyword-based full-text search (baseline fallback when vector search unavailable)."""
+
+from __future__ import annotations
+
+import re
+import time
+from typing import Any
+
+from sqlalchemy.orm import Session
+
+from app.core.metrics import get_metrics
+from app.core.otel import traced_span
+from app.models.equipment import FaultCode
+from app.models.knowledge import KnowledgeArticle
+
+
+def _tokenize(text: str) -> list[str]:
+    # Tokenization: tokenized by words
+    if not text:
+        return []
+    tokens: list[str] = []
+    for part in re.split(r"[\s,，。、；;:：！!？?()（）\[\]【】]+", text):
+        if not part:
+            continue
+        if re.fullmatch(r"[A-Za-z0-9_-]+", part):
+            tokens.append(part.lower())
+        else:
+            for i in range(len(part) - 1):
+                tokens.append(part[i : i + 2])
+    return tokens
+
+
+@traced_span("rag.retrieve", {"rag.backend": "keyword-baseline"})
+def search_articles(
+    db: Session,
+    query: str,
+    equipment_type_id: int | None = None,
+    fault_code: str | None = None,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Search knowledge articles by keyword, returning scored results (with RAG metrics)."""
+    _metrics = get_metrics()
+    _started = time.perf_counter()
+    q = db.query(KnowledgeArticle).filter(KnowledgeArticle.status == "published")
+    tokens = _tokenize(query)
+    results: list[dict[str, Any]] = []
+    articles = q.all()
+    # Fault code mapping
+    fc_filter = None
+    if fault_code:
+        fc = db.query(FaultCode).filter(FaultCode.code == fault_code).first()
+        if fc:
+            fc_filter = fc.id
+    for art in articles:
+        if (
+            equipment_type_id
+            and art.equipment_type_id
+            and art.equipment_type_id != equipment_type_id
+        ):
+            # Soft demotion rather than hard filtering
+            pass
+        haystack = " ".join(
+            filter(
+                None, [art.title, art.content, art.summary, " ".join(art.tags or [])]
+            )
+        )
+        ht = _tokenize(haystack)
+        if not tokens:
+            score = 0.1
+        else:
+            score = sum(1 for t in tokens if t in ht) / max(len(tokens), 1)
+        # Fault code match boost
+        if fc_filter and art.fault_code_id == fc_filter:
+            score += 0.5
+        if equipment_type_id and art.equipment_type_id == equipment_type_id:
+            score += 0.2
+        if score > 0:
+            results.append(
+                {
+                    "article_id": art.id,
+                    "title": art.title,
+                    "content": art.content,
+                    "summary": art.summary,
+                    "category": art.category.value if art.category else None,
+                    "source": art.source,
+                    "score": round(score, 3),
+                }
+            )
+    results.sort(key=lambda x: x["score"], reverse=True)
+    page = results[:limit]
+    # RAG operational metrics (low-cardinality labels; query text excluded).
+    _metrics.rag_retrieval_latency_seconds.observe(time.perf_counter() - _started)
+    _metrics.rag_retrieval_total.labels(status="success").inc()
+    _metrics.rag_result_count.observe(len(page))
+    if not page:
+        _metrics.rag_empty_result_total.inc()
+    return page
+
+
+def find_similar_work_orders(db, wo, limit: int = 3) -> list:
+    """Search historical work orders based on keyword similarity (vector fallback)."""
+    from app.models.base import WorkOrderStatusEnum
+    from app.models.workorder import WorkOrder
+
+    base_text = " ".join(filter(None, [wo.title, wo.fault_description or ""]))
+    tokens = set(_tokenize(base_text))
+    candidates = (
+        db.query(WorkOrder)
+        .filter(WorkOrder.status == WorkOrderStatusEnum.completed)
+        .filter(WorkOrder.id != wo.id)
+        .limit(200)
+        .all()
+    )
+    scored = []
+    for c in candidates:
+        ct = set(
+            _tokenize(" ".join(filter(None, [c.title, c.fault_description or ""])))
+        )
+        if not tokens or not ct:
+            continue
+        overlap = len(tokens & ct) / max(len(tokens), 1)
+        if overlap > 0.1:
+            scored.append((c, overlap))
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return scored[:limit]

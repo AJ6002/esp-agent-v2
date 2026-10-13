@@ -1,0 +1,14 @@
+.agent/
+.agents/
+.github/
+.git/
+node_modules/
+.next/
+dist/
+build/
+venv/
+.venv/
+data/raw/
+data/interim/
+data/processed/
+artifacts/

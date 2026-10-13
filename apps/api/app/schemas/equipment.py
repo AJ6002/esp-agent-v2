@@ -1,0 +1,133 @@
+"""Equipment, equipment types, fault codes, spare parts schemas."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict
+
+from app.models.base import EquipmentStatusEnum, RiskLevelEnum
+
+
+class EquipmentTypeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    description: str | None = None
+
+
+class EquipmentTypeCreate(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class EquipmentBase(BaseModel):
+    code: str
+    name: str
+    equipment_type_id: int | None = None
+    plant: str | None = None
+    production_line: str | None = None
+    location: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+    commissioning_date: date | None = None
+    status: EquipmentStatusEnum = EquipmentStatusEnum.running
+    risk_level: RiskLevelEnum = RiskLevelEnum.medium
+    health_score: float = 100.0
+    rated_parameters: dict | None = None
+    cumulative_runtime_hours: float = 0.0
+    responsible_person_id: int | None = None
+    remarks: str | None = None
+
+
+class EquipmentCreate(EquipmentBase):
+    pass
+
+
+class EquipmentUpdate(BaseModel):
+    name: str | None = None
+    equipment_type_id: int | None = None
+    plant: str | None = None
+    production_line: str | None = None
+    location: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+    commissioning_date: date | None = None
+    status: EquipmentStatusEnum | None = None
+    risk_level: RiskLevelEnum | None = None
+    health_score: float | None = None
+    rated_parameters: dict | None = None
+    cumulative_runtime_hours: float | None = None
+    responsible_person_id: int | None = None
+    last_maintenance_at: date | None = None
+    next_maintenance_at: date | None = None
+    remarks: str | None = None
+
+
+class EquipmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    asset_uuid: str
+    code: str
+    name: str
+    equipment_type_id: int | None = None
+    equipment_type_name: str | None = None
+    plant: str | None = None
+    production_line: str | None = None
+    location: str | None = None
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+    commissioning_date: date | None = None
+    status: EquipmentStatusEnum
+    risk_level: RiskLevelEnum
+    health_score: float
+    rated_parameters: dict | None = None
+    cumulative_runtime_hours: float
+    responsible_person_id: int | None = None
+    responsible_person_name: str | None = None
+    last_maintenance_at: date | None = None
+    next_maintenance_at: date | None = None
+    qr_token: str
+    remarks: str | None = None
+    created_at: datetime | None = None
+
+
+class FaultCodeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    code: str
+    name: str
+    description: str | None = None
+    severity: str
+    equipment_type_id: int | None = None
+
+
+class FaultCodeCreate(BaseModel):
+    code: str
+    name: str
+    description: str | None = None
+    severity: str = "medium"
+    equipment_type_id: int | None = None
+
+
+class SparePartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    code: str
+    name: str
+    specification: str | None = None
+    unit: str
+    stock_qty: int
+    remarks: str | None = None
+
+
+class SparePartCreate(BaseModel):
+    code: str
+    name: str
+    specification: str | None = None
+    unit: str = "pcs"
+    stock_qty: int = 0
+    remarks: str | None = None

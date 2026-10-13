@@ -1,0 +1,11 @@
+﻿import json
+from graphify.detect import detect
+from pathlib import Path
+
+result = detect(Path('.'))
+Path('graphify-out/.graphify_detect.json').write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
+print(f"Detected {result['total_files']} files")
+print(f"Corpus: {result['total_files']} files · ~{result.get('total_words', 0):,} words")
+for cat, files in result.get('files', {}).items():
+    if files:
+        print(f"  {cat}: {len(files)} files")

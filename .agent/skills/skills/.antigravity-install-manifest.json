@@ -1,0 +1,298 @@
+{
+  "academic-paper": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "academic-paper-reviewer": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "academic-pipeline": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "agent-memory-systems": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "antigravity-workflows": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "api-patterns": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "backend-architect": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "brainstorming": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "cavecrew": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "caveman": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "ce-babysit-pr": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-brainstorm": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-code-review": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-commit": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-commit-push-pr": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-compound": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-compound-refresh": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-debug": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-doc-review": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-dogfood": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-explain": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-handoff": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-ideate": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-optimize": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-plan": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-polish": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-pov": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-product-pulse": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-promote": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-proof": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-prototype": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-resolve-pr-feedback": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-retune": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-riffrec-feedback-analysis": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-setup": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-simplify-code": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-strategy": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-sweep": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-test-browser": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-test-xcode": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-work": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "ce-worktree": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "claude-code-guide": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "deep-research": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "frontend-design": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "gha": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "graphify": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "half-clone": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "handoff": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "impeccable": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "jenny": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "karen": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "karpathy": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "karpathy-guidelines": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "last30days": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "lfg": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "EveryInc/compound-engineering-plugin"
+  },
+  "loki-mode": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "nextjs-best-practices": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "pre-ci-check": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "pydantic-models-py": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "python-patterns": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "quarter-clone": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "react-patterns": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "security-auditor": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "shadcn": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "systematic-debugging": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "tailwind-patterns": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "taste-skill": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "tdd-workflow": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "ultrathink-debugger": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "writing-plans": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "writing-skills": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "zero-hallucination-coder": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  },
+  "zustand-store-ts": {
+    "installed_at": "2026-08-31T14:56:00Z",
+    "source": "local"
+  }
+}

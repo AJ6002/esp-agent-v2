@@ -1,0 +1,490 @@
+import { User, WorkOrderStatus, Priority, Role, ApiError, ConvertToWorkOrderRequest, ConvertToWorkOrderResponse, MLModelVersion, MLPredictionRecord, GatewayStatus, GatewayNodes, GatewayTestConnect, GatewaySyncResult, GatewaySubscriptionStatus, SubscriptionActionResult, IndustrialAlarmList, AlarmAnalysis, AlarmCorrelateResult, AlarmWorkOrderResult, ObservabilityHealth, TraceSearchResult, TraceDetail, MetricsSummary, DemoState } from './types';
+
+const BASE = '/api/v1';
+
+function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('token');
+}
+
+async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(opts.headers as Record<string, string> || {}),
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, { ...opts, headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (body && typeof body === 'object') {
+      // Handle FastAPI HTTPException detail format
+      if (body.detail) {
+        const detail = body.detail;
+        if (typeof detail === 'object') {
+          throw new ApiError(res.status, detail);
+        }
+        throw new ApiError(res.status, detail as string);
+      }
+      // Handle custom JSONResponse (e.g. completion validation error)
+      if (body.missing_requirements) {
+        const err = new ApiError(res.status, body.message || 'Request failed');
+        (err as any).response = { data: body };
+        throw err;
+      }
+    }
+    throw new ApiError(res.status, `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Auth
+export async function login(email: string, password: string) {
+  return request<{ access_token: string; role: string; user_id: number; full_name: string }>('/auth/login', {
+    method: 'POST', body: JSON.stringify({ email, password }),
+  });
+}
+export async function getMe() { return request<User>('/auth/me'); }
+
+// Users / Technicians
+export async function listUsers(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<{ items: any[]; total: number }>(`/users${qs}`);
+}
+export async function listTechnicians() { return request<any[]>('/users/technicians'); }
+
+// Equipment
+export async function listEquipment(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<{ items: any[]; total: number }>(`/equipment${qs}`);
+}
+export async function getEquipment(id: number) { return request<any>(`/equipment/${id}`); }
+export async function createEquipment(data: any) { return request<any>('/equipment', { method: 'POST', body: JSON.stringify(data) }); }
+export async function updateEquipment(id: number, data: any) {
+  return request<any>(`/equipment/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function getEquipmentWorkOrders(id: number) { return request<any[]>(`/equipment/${id}/work-orders`); }
+export async function listEquipmentTypes() { return request<any[]>('/equipment-types'); }
+export async function listFaultCodes() { return request<any[]>('/fault-codes'); }
+export async function listSpareParts() { return request<any[]>('/spare-parts'); }
+
+// Fault Reports
+export async function listFaultReports(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<{ items: any[]; total: number }>(`/fault-reports${qs}`);
+}
+export async function getFaultReport(id: number) { return request<any>(`/fault-reports/${id}`); }
+export async function createFaultReport(data: any) { return request<any>('/fault-reports', { method: 'POST', body: JSON.stringify(data) }); }
+export async function parseFaultText(text: string) { return request<any>('/fault-reports/parse', { method: 'POST', body: JSON.stringify({ text }) }); }
+export async function convertFaultReportToWorkOrder(frId: number, data?: ConvertToWorkOrderRequest) {
+  return request<ConvertToWorkOrderResponse>(`/fault-reports/${frId}/convert-to-work-order`, {
+    method: 'POST', body: JSON.stringify(data || {}),
+  });
+}
+
+// Work Orders
+export async function listWorkOrders(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<{ items: any[]; total: number }>(`/work-orders${qs}`);
+}
+export async function getWorkOrder(id: number) { return request<any>(`/work-orders/${id}`); }
+export async function createWorkOrder(data: any) { return request<any>('/work-orders', { method: 'POST', body: JSON.stringify(data) }); }
+export async function updateWorkOrder(id: number, data: any) {
+  return request<any>(`/work-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function assignWorkOrder(id: number, data: { assignee_id: number; priority?: string; planned_end_at?: string }) {
+  return request<any>(`/work-orders/${id}/assign`, { method: 'POST', body: JSON.stringify(data) });
+}
+export async function acceptWorkOrder(id: number) { return request<any>(`/work-orders/${id}/accept`, { method: 'POST' }); }
+export async function startWorkOrder(id: number, safetyConfirmation?: { confirmed: boolean; note: string }) {
+  return request<any>(`/work-orders/${id}/start`, {
+    method: 'POST',
+    body: safetyConfirmation ? JSON.stringify(safetyConfirmation) : undefined,
+  });
+}
+export async function pauseWorkOrder(id: number) { return request<any>(`/work-orders/${id}/pause`, { method: 'POST' }); }
+export async function resumeWorkOrder(id: number, safetyConfirmation?: { confirmed: boolean; note: string }) {
+  return request<any>(`/work-orders/${id}/resume`, {
+    method: 'POST',
+    body: safetyConfirmation ? JSON.stringify(safetyConfirmation) : undefined,
+  });
+}
+export async function submitWorkOrder(id: number, data: any) {
+  return request<any>(`/work-orders/${id}/submit`, { method: 'POST', body: JSON.stringify(data) });
+}
+export async function approveWorkOrder(id: number) { return request<any>(`/work-orders/${id}/approve`, { method: 'POST' }); }
+export async function rejectWorkOrder(id: number, remark: string) {
+  return request<any>(`/work-orders/${id}/reject`, { method: 'POST', body: JSON.stringify({ remark }) });
+}
+export async function cancelWorkOrder(id: number) { return request<any>(`/work-orders/${id}/cancel`, { method: 'POST' }); }
+export async function updateChecklistItem(woId: number, itemId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/checklist/${itemId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function addMaintenanceLog(woId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/logs`, { method: 'POST', body: JSON.stringify(data) });
+}
+export async function addLaborEntry(woId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/labor`, { method: 'POST', body: JSON.stringify(data) });
+}
+export async function addSparePartUsage(woId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/spare-parts`, { method: 'POST', body: JSON.stringify(data) });
+}
+
+// Work Orders - Update/Delete for logs, labor, spare-parts
+export async function updateMaintenanceLog(woId: number, logId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/logs/${logId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function updateLaborEntry(woId: number, entryId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/labor/${entryId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteLaborEntry(woId: number, entryId: number) {
+  return request<any>(`/work-orders/${woId}/labor/${entryId}`, { method: 'DELETE' });
+}
+export async function updateSparePartUsage(woId: number, recordId: number, data: any) {
+  return request<any>(`/work-orders/${woId}/spare-parts/${recordId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteSparePartUsage(woId: number, recordId: number) {
+  return request<any>(`/work-orders/${woId}/spare-parts/${recordId}`, { method: 'DELETE' });
+}
+
+// Work Orders - Reports
+export async function getWorkOrderReport(woId: number) {
+  return request<any>(`/work-orders/${woId}/report`);
+}
+export async function regenerateWorkOrderReport(woId: number) {
+  return request<any>(`/work-orders/${woId}/report/regenerate`, { method: 'POST' });
+}
+
+// Work Orders - Attachments
+export async function addAttachment(woId: number, file: File) {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${BASE}/work-orders/${woId}/attachments`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, body?.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Copilot
+export async function copilotDiagnose(data: { work_order_id?: number; fault_description: string; equipment_id?: number; fault_code?: string }) {
+  return request<any>('/copilot/diagnose', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function copilotRewriteLog(content: string) {
+  return request<any>('/copilot/rewrite-maintenance-log', { method: 'POST', body: JSON.stringify({ content }) });
+}
+export async function copilotGenerateReport(workOrderId: number) {
+  return request<any>('/copilot/generate-report', { method: 'POST', body: JSON.stringify({ work_order_id: workOrderId }) });
+}
+export async function copilotAsk(
+  question: string,
+  equipmentTypeId?: number,
+  faultCode?: string,
+  conversationHistory?: Array<{ role: string; content: string }>,
+) {
+  return request<any>('/copilot/ask', {
+    method: 'POST',
+    body: JSON.stringify({
+      question,
+      equipment_type_id: equipmentTypeId,
+      fault_code: faultCode,
+      conversation_history: conversationHistory,
+    }),
+  });
+}
+export async function copilotEquipmentHistory(equipmentId: number) {
+  return request<any>(`/copilot/equipment-history/${equipmentId}`);
+}
+
+// Knowledge
+export async function listKnowledge(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<{ items: any[]; total: number }>(`/knowledge${qs}`);
+}
+export async function getKnowledge(id: number) { return request<any>(`/knowledge/${id}`); }
+export async function createKnowledge(data: any) { return request<any>('/knowledge', { method: 'POST', body: JSON.stringify(data) }); }
+export async function updateKnowledge(id: number, data: any) {
+  return request<any>(`/knowledge/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteKnowledge(id: number) { return request<any>(`/knowledge/${id}`, { method: 'DELETE' }); }
+export async function searchKnowledge(q: string, faultCode?: string, equipmentTypeId?: number) {
+  const params = new URLSearchParams({ q });
+  if (faultCode) params.set('fault_code', faultCode);
+  if (equipmentTypeId) params.set('equipment_type_id', String(equipmentTypeId));
+  return request<any[]>(`/knowledge/search?${params.toString()}`);
+}
+
+// Dashboard
+export async function getSupervisorDashboard() { return request<any>('/dashboard/supervisor'); }
+export async function getTechnicianDashboard() { return request<any>('/dashboard/technician'); }
+
+// Intelligent maintenance
+export async function getIntelligenceOverview() {
+  return request<any>('/intelligence/overview');
+}
+export async function getEquipmentIntelligence(id: number, limit = 60) {
+  return request<any>(`/intelligence/equipment/${id}?limit=${limit}`);
+}
+export async function listAnomalies(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<any[]>(`/intelligence/anomalies${qs}`);
+}
+export async function listPredictions() {
+  return request<any[]>('/intelligence/predictions');
+}
+export async function listMLModels(taskType?: MLModelVersion['task_type']) {
+  const qs = taskType ? `?task_type=${encodeURIComponent(taskType)}` : '';
+  return request<MLModelVersion[]>(`/ml/models${qs}`);
+}
+export async function listMLPredictionRecords() {
+  return request<MLPredictionRecord[]>('/ml/predictions');
+}
+export async function listDiagnoses() {
+  return request<any[]>('/intelligence/diagnoses');
+}
+export async function listMaintenanceRecommendations() {
+  return request<any[]>('/intelligence/recommendations');
+}
+export async function getSimulatorStatus() {
+  return request<any>('/intelligence/simulator/status');
+}
+export async function configureSimulator(data: {
+  equipment_ids: number[];
+  interval_seconds: number;
+  scenario: string;
+  seed: number;
+  auto_create_work_orders: boolean;
+}) {
+  return request<any>('/intelligence/simulator/configure', {
+    method: 'POST', body: JSON.stringify(data),
+  });
+}
+export async function startSimulator() {
+  return request<any>('/intelligence/simulator/start', { method: 'POST' });
+}
+export async function pauseSimulator() {
+  return request<any>('/intelligence/simulator/pause', { method: 'POST' });
+}
+export async function resetSimulator() {
+  return request<any>('/intelligence/simulator/reset', { method: 'POST' });
+}
+export async function tickSimulator() {
+  return request<any>('/intelligence/simulator/tick', { method: 'POST' });
+}
+export async function listOperationApprovals(status?: string, limit = 100, offset = 0) {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  if (status) params.set('status', status);
+  return request<any[]>(`/intelligence/approvals?${params.toString()}`);
+}
+export async function approveOperation(id: number, note?: string) {
+  return request<any>(`/intelligence/approvals/${id}/approve`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  });
+}
+export async function rejectOperation(id: number, note?: string) {
+  return request<any>(`/intelligence/approvals/${id}/reject`, {
+    method: 'POST', body: JSON.stringify({ note }),
+  });
+}
+export async function reconcileOperation(id: number, data: {
+  outcome: 'confirmed_executed' | 'confirmed_not_executed' | 'confirmed_failed';
+  note: string;
+  observed_device_state: string;
+}) {
+  return request<any>(`/intelligence/approvals/${id}/reconcile`, {
+    method: 'POST', body: JSON.stringify(data),
+  });
+}
+export async function verifyMaintenance(data: {
+  work_order_id: number;
+  notes?: string;
+  create_knowledge_case?: boolean;
+}) {
+  return request<any>('/intelligence/verifications', {
+    method: 'POST', body: JSON.stringify(data),
+  });
+}
+
+// Industrial Gateway (OPC UA, read-only)
+export async function getGatewayStatus() {
+  return request<GatewayStatus>('/gateway/status');
+}
+export async function getGatewayNodes() {
+  return request<GatewayNodes>('/gateway/nodes');
+}
+export async function testGatewayConnection() {
+  return request<GatewayTestConnect>('/gateway/test-connect', { method: 'POST' });
+}
+export async function syncGateway() {
+  return request<GatewaySyncResult>('/gateway/sync', { method: 'POST' });
+}
+export async function reloadGatewayMappings() {
+  return request<{ created: number; updated: number; skipped: string[] }>('/gateway/mappings/reload', { method: 'POST' });
+}
+export async function getGatewaySubscriptions() {
+  return request<GatewaySubscriptionStatus>('/gateway/subscriptions');
+}
+export async function startGatewaySubscriptions() {
+  return request<SubscriptionActionResult>('/gateway/subscriptions/start', { method: 'POST' });
+}
+export async function stopGatewaySubscriptions() {
+  return request<SubscriptionActionResult>('/gateway/subscriptions/stop', { method: 'POST' });
+}
+
+// Industrial Alarms (OPC UA Alarm semantics)
+export async function listAlarms(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  return request<IndustrialAlarmList>(`/alarms${qs}`);
+}
+export async function acknowledgeAlarm(id: number) {
+  return request<{ ok: boolean; id: number; acknowledged: boolean }>(`/alarms/${id}/acknowledge`, { method: 'POST' });
+}
+
+// Alarm Intelligence (AI-assisted analysis, suggestions only)
+export async function analyzeAlarm(id: number) {
+  return request<AlarmAnalysis>(`/alarms/${id}/analyze`, { method: 'POST' });
+}
+export async function getAlarmAnalysis(id: number) {
+  return request<AlarmAnalysis>(`/alarms/${id}/analysis`);
+}
+export async function correlateAlarms(windowSeconds?: number) {
+  const qs = windowSeconds ? `?window_seconds=${windowSeconds}` : '';
+  return request<AlarmCorrelateResult>(`/alarms/correlate${qs}`, { method: 'POST' });
+}
+export async function reviewAlarm(
+  id: number,
+  action: 'approve' | 'reject' | 'request_more_evidence',
+  note?: string,
+) {
+  return request<AlarmAnalysis>(`/alarms/${id}/review`, {
+    method: 'POST', body: JSON.stringify({ action, note }),
+  });
+}
+export async function createAlarmWorkOrder(id: number) {
+  return request<AlarmWorkOrderResult>(`/alarms/${id}/create-work-order`, { method: 'POST' });
+}
+
+// ---------------- Observability & Traceability ----------------
+
+export async function getObservabilityHealth() {
+  return request<ObservabilityHealth>('/observability/health');
+}
+
+export async function searchTraces(params: Record<string, string | number> = {}) {
+  const qs = '?' + new URLSearchParams(
+    Object.entries(params).reduce<Record<string, string>>((acc, [k, v]) => {
+      if (v !== '' && v !== undefined && v !== null) acc[k] = String(v);
+      return acc;
+    }, {})
+  ).toString();
+  return request<TraceSearchResult>(`/observability/traces${qs === '?' ? '' : qs}`);
+}
+
+export async function getTrace(traceId: string) {
+  return request<TraceDetail>(`/observability/traces/${encodeURIComponent(traceId)}`);
+}
+
+export async function getMetricsSummary() {
+  return request<MetricsSummary>('/observability/metrics-summary');
+}
+export async function getDemoState(equipmentCode = 'Motor001') {
+  return request<DemoState>(
+    `/demo/state?equipment_code=${encodeURIComponent(equipmentCode)}`
+  );
+}
+
+export async function setDemoScenario(
+  scenario: 'normal' | 'warning' | 'fault',
+  ticks?: number,
+  equipmentCode = 'Motor001'
+) {
+  return request<{
+    scenario: string;
+    ticks: number;
+    simulation_only: boolean;
+    published_events: number;
+    snapshots_ingested: number;
+    anomalies: number;
+    work_orders_created: number;
+    trace_id: string | null;
+  }>('/demo/simulator/scenario', {
+    method: 'POST',
+    body: JSON.stringify({
+      scenario,
+      ...(ticks ? { ticks } : {}),
+      equipment_code: equipmentCode,
+    }),
+  });
+}
+
+// ---------------- ESP APM Real-Time Diagnosis (Server 184) ----------------
+
+export interface ESPEventSummary {
+  event_id: string;
+  well_id: string;
+  timestamp: string;
+  trip_cause: string;
+  severity: string;
+  scenario?: string;
+  operating_state?: string;
+}
+
+export interface ESPActiveWell {
+  well_id: string;
+  cluster?: string;
+  pump_type?: string;
+  motor_hp?: number;
+  rated_amp_a?: number;
+  max_vibration_g?: number;
+  is_active: boolean;
+}
+
+export interface ESPDiagnosisResponse {
+  event_id: string;
+  well_id: string;
+  event_timestamp: string;
+  trip_cause: string;
+  severity: string;
+  scenario?: string;
+  operating_state?: string;
+  mathematical_confidence_pct: number;
+  markdown_report: string;
+  structured_data: any;
+  disclaimer: string;
+}
+
+export async function listRecentESPEvents(limit = 20): Promise<ESPEventSummary[]> {
+  return request<ESPEventSummary[]>(`/esp/recent-events?limit=${limit}`);
+}
+
+export async function listActiveESPWells(): Promise<ESPActiveWell[]> {
+  return request<ESPActiveWell[]>('/esp/wells');
+}
+
+export async function diagnoseESPEvent(params: {
+  event_id?: string;
+  well_id?: string;
+  timestamp?: string;
+}): Promise<ESPDiagnosisResponse> {
+  return request<ESPDiagnosisResponse>('/esp/diagnose-event', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function getESPHealth() {
+  return request<{
+    status: string;
+    esp_apm_db_connected: boolean;
+    esp_apm_db_readonly: boolean;
+    llm_enabled: boolean;
+    llm_model: string;
+    llm_base: string;
+  }>('/esp/health');
+}
