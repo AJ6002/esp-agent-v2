@@ -36,6 +36,10 @@ from app.schemas.esp_diagnosis import (
     HybridRouteResult,
     HypothesisItem,
     ImpactMetrics,
+    MonitoredAssetScope,
+    DomainCapabilityItem,
+    SystemBoundaryItem,
+    SelfKnowledgeReport,
     NextStepItem,
     PeerBenchmarkReport,
     PetroleumChunk,
@@ -2838,12 +2842,375 @@ def rank_fleet_by_metric(metric: str = "vibration", sort_order: str = "DESC") ->
     )
 
 
+# =========================================================================
+# DOMAIN 10: SELF-KNOWLEDGE & IDENTITY ENGINE FUNCTIONS
+# =========================================================================
+
+def get_self_identity() -> SelfKnowledgeReport:
+    """Capability 10.1: Discloses core agent persona, role, architecture, and safety contract."""
+    md = (
+        "# [ESP APM] System Identity & Architecture Specification\n\n"
+        "**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics\n"
+        "**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)\n"
+        "**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`\n\n"
+        "### 1. CORE SYSTEM MISSION\n"
+        "I provide real-time operational surveillance, physics-grounded root cause diagnosis, "
+        "and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. "
+        "My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.\n\n"
+        "### 2. ARCHITECTURAL PILLARS\n"
+        "- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).\n"
+        "- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.\n"
+        "- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.\n\n"
+        "---\n"
+        "> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*\n"
+    )
+    return SelfKnowledgeReport(
+        intent="10.1 Agent Identity",
+        identity_title="ESP APM Industrial Maintenance Copilot",
+        version="2.4.0",
+        environment="PostgreSQL Server 184 (Production APM)",
+        safety_contract="READ_ONLY_DECISION_SUPPORT",
+        markdown_report=md,
+    )
+
+
+def get_self_capabilities() -> SelfKnowledgeReport:
+    """Capability 10.2: Complete catalog of operational capabilities across all active domains."""
+    caps = [
+        DomainCapabilityItem(
+            domain_id="DOMAIN_1",
+            name="Fleet Operational Surveillance",
+            description="Real-time production rollups, deferred oil calculation, triage urgency matrix, executive briefings, and alarm clustering.",
+            example_queries=["Show fleet inventory", "Show total fleet production", "Fleet triage ranking", "Executive morning briefing"]
+        ),
+        DomainCapabilityItem(
+            domain_id="DOMAIN_2",
+            name="Fleet Comparative Analytics",
+            description="Multi-well comparisons, gathering cluster rollups, 24h vs baseline delta audits, peer benchmarking, event before/after telemetry, and fleet metric rankings.",
+            example_queries=["Compare well FS-017 vs FS-040", "Compare Cluster 15 vs Cluster 4", "Show baseline comparison for FS-004", "Benchmark FS-017 vs cluster peers", "Rank wells by vibration"]
+        ),
+        DomainCapabilityItem(
+            domain_id="EVENT_DIAGNOSTICS",
+            name="Trip Root Cause Diagnostics",
+            description="Multi-hypothesis physics diagnosis of ESP electrical, mechanical, and hydraulic trips incorporating telemetry waveforms.",
+            example_queries=["Diagnose event EV-20261012-103435-FNW-001-878", "Why did well FS-017 trip?"]
+        ),
+        DomainCapabilityItem(
+            domain_id="WORK_ORDERS",
+            name="Autonomous Work Order Dispatch",
+            description="Generates emergency P1 maintenance work orders with mandatory Lockout/Tagout (LOTO) safety checklists and zero-voltage multimeter verification.",
+            example_queries=["Dispatch work order for well FS-017"]
+        ),
+        DomainCapabilityItem(
+            domain_id="PETROLEUM_RAG",
+            name="Petroleum Engineering Knowledge Base",
+            description="Semantic retrieval of API RP 11S standards and troubleshooting guides for gas locking, emulsion, cavitation, and sand wear.",
+            example_queries=["What causes gas locking in an ESP?", "How to prevent sand abrasion?"]
+        ),
+    ]
+
+    rows_md = []
+    for c in caps:
+        rows_md.append(
+            f"### • {c.name} (`{c.domain_id}`)\n"
+            f"- **Scope**: {c.description}\n"
+            f"- **Example Queries**: " + ", ".join([f"`\"{q}\"`" for q in c.example_queries]) + "\n"
+        )
+
+    md = (
+        "# [ESP APM] System Capability Manifest\n\n"
+        "**System Version**: `2.4.0` | **Engine**: Hybrid Semantic & Physics Decision Engine\n\n"
+        + "\n".join(rows_md) + "\n"
+        "---\n"
+        "> *All capability engines execute directly against live telemetry and asset registries without mock data.*\n"
+    )
+
+    return SelfKnowledgeReport(
+        intent="10.2 Capability List",
+        identity_title="ESP APM System Capability Manifest",
+        version="2.4.0",
+        capabilities=caps,
+        markdown_report=md,
+    )
+
+
+def get_self_boundaries() -> SelfKnowledgeReport:
+    """Capability 10.3: Explicit boundary declarations and refusal of physical control commands."""
+    boundaries = [
+        SystemBoundaryItem(
+            category="CONTROL",
+            boundary="No Physical Actuation / Direct SCADA Control",
+            rationale="The Copilot has zero write access to physical Variable Speed Drives (VSDs), switchgear, or wellhead choke valves. Commands to start, stop, or change ESP frequencies are strictly blocked."
+        ),
+        SystemBoundaryItem(
+            category="SAFETY",
+            boundary="Advisory Decision Support Only",
+            rationale="AI-generated diagnoses, failure root causes, and recommended restart procedures require human Production Engineer review and mandatory field sign-off before execution."
+        ),
+        SystemBoundaryItem(
+            category="SENSORS",
+            boundary="Telemetry Instrumentation Boundary",
+            rationale="Surveillance is restricted to downhole and surface electrical, mechanical, and hydraulic sensors. Downhole chemical fluid sampling and fiber-optic acoustic arrays are outside monitored scope."
+        ),
+        SystemBoundaryItem(
+            category="INTEGRATION",
+            boundary="Enterprise ERP Dispatch Boundary",
+            rationale="Work orders are created and staged within the local APM operational database. Direct bi-directional synchronization with external SAP/Maximo ERP systems requires explicit export approval."
+        ),
+    ]
+
+    rows_md = [
+        f"| **{b.category}** | **{b.boundary}** | {b.rationale} |"
+        for b in boundaries
+    ]
+
+    md = (
+        "# [ESP APM] Operational Boundaries & Safety Constraints\n\n"
+        "**Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`\n\n"
+        "| Category | Boundary Restriction | Operational Rationale |\n"
+        "|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        "### ⚠️ Physical Actuation Protocol\n"
+        "If you request pump starts, shutdowns, or VSD frequency modulation, the Copilot will refuse physical execution "
+        "and provide the authorized standard operating restart procedure (SOP) with safety checklist items instead.\n"
+    )
+
+    return SelfKnowledgeReport(
+        intent="10.3 Boundary Declaration",
+        identity_title="ESP APM Operational Boundaries",
+        version="2.4.0",
+        boundaries=boundaries,
+        markdown_report=md,
+    )
+
+
+def get_self_fleet_scope() -> SelfKnowledgeReport:
+    """Capability 10.4: Dynamic fleet scope query directly against PostgreSQL Server 184."""
+    with get_esp_cursor() as cur:
+        cur.execute("""
+            WITH latest_telem AS (
+                SELECT DISTINCT ON (well_id) well_id, operating_state
+                FROM opg_well_telemetry
+                ORDER BY well_id, timestamp DESC
+            )
+            SELECT w.well_id, w.cluster, COALESCE(w.motor_hp, 0), COALESCE(t.operating_state, 'UNKNOWN')
+            FROM asset_registry w
+            LEFT JOIN latest_telem t ON w.well_id = t.well_id
+            ORDER BY w.cluster, w.well_id;
+        """)
+        rows = cur.fetchall()
+
+    assets = [
+        MonitoredAssetScope(
+            well_id=str(r[0]),
+            cluster=f"Cluster {r[1]}",
+            motor_hp=float(r[2]),
+            operating_state=str(r[3]).upper(),
+        )
+        for r in rows
+    ]
+
+    total_count = len(assets)
+    online_count = sum(1 for a in assets if a.operating_state == "RUNNING")
+    stopped_count = total_count - online_count
+    total_hp = sum(a.motor_hp for a in assets)
+    clusters = sorted(list({a.cluster for a in assets}))
+
+    summary = {
+        "total_monitored_wells": total_count,
+        "online_wells": online_count,
+        "stopped_wells": stopped_count,
+        "total_installed_hp": round(total_hp, 1),
+        "gathering_clusters": clusters,
+    }
+
+    rows_md = [
+        f"| `{a.well_id}` | `{a.cluster}` | `{a.motor_hp:.1f} HP` | `{a.operating_state}` |"
+        for a in assets
+    ]
+
+    md = (
+        f"# [ESP APM] Monitored Fleet Scope\n\n"
+        f"**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`) | **Total Fleet**: `{total_count} Monitored Assets`\n\n"
+        f"### Operational Rollup\n"
+        f"- **Active Gathering Stations**: `{', '.join(clusters)}`\n"
+        f"- **Fleet Status**: `{online_count}/{total_count} Online` ({stopped_count} Offline / Stopped)\n"
+        f"- **Installed Power**: `{total_hp:.1f} HP` total fleet motor rating\n\n"
+        f"| Well Identifier | Gathering Cluster | Motor Rating | Real-Time State |\n"
+        f"|---|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        f"*(All {total_count} monitored wells are continuously tracked via synchronous downhole sensor feeds).*\n"
+    )
+
+    return SelfKnowledgeReport(
+        intent="10.4 Fleet Scope",
+        identity_title="ESP APM Monitored Fleet Scope",
+        version="2.4.0",
+        fleet_scope_summary=summary,
+        assets=assets,
+        markdown_report=md,
+    )
+
+
+def get_self_tasks() -> SelfKnowledgeReport:
+    """Capability 10.5: Structured task & workflow catalog for production operations."""
+    tasks = [
+        "**Trip Root Cause Analysis**: Automated 24h & ±2h waveform feature extraction, electrical imbalance detection, and physical fault isolation.",
+        "**Daily Morning Surveillance**: Cluster-by-cluster availability rollup, gross liquid / net oil accounting, and deferred production tracking.",
+        "**Fleet Operational Triage**: Automatic risk scoring and ranking of tripped assets to prioritize engineering dispatch.",
+        "**Historical Baseline Integrity**: Rolling 24-hour vs 7-day prior operating baseline comparison for detecting gradual pump degradation.",
+        "**Peer Group Benchmarking**: Evaluating target well parameters (PIP, PDP, Vibration, Amps) against cluster peer group medians.",
+        "**Emergency Work Order Preparation**: Dispatching P1 work orders complete with mandatory Lockout/Tagout (LOTO) protocols and multimeter testing.",
+        "**Petroleum Engineering Advisory**: Semantic search over API RP 11S standards and field troubleshooting manuals for operational best practices."
+    ]
+
+    md = (
+        "# [ESP APM] Supported Tasks & Operational Workflows\n\n"
+        "**Purpose**: Standard Operating Procedures (SOP) supported by the Copilot engine\n\n"
+        + "\n".join([f"{i+1}. {t}" for i, t in enumerate(tasks)]) + "\n\n"
+        "---\n"
+        "> *Each workflow can be initiated via natural language queries or targeted follow-up suggestions.*\n"
+    )
+
+    return SelfKnowledgeReport(
+        intent="10.5 Objective List",
+        identity_title="ESP APM Supported Tasks & Workflows",
+        version="2.4.0",
+        markdown_report=md,
+    )
+
+
+def get_self_limitations() -> SelfKnowledgeReport:
+    """Capability 10.6: Honest disclosure of system limitations and unmonitored dimensions."""
+    limitations = [
+        "**Sensor Coverage Limitations**: Downhole sensor telemetry captures electrical (current/amps), mechanical (vibration/motor temp), and hydraulic (intake/discharge pressure, flow rate, water cut). There is no real-time downhole chemical fluid sampling, acoustic sand detection, or fiber-optic distributed temperature sensing (DTS).",
+        "**Telemetry Sampling Cadence**: Real-time telemetry is recorded via periodic downhole polling cycles; sub-millisecond high-frequency transient electrical capture (e.g. oscilloscope-grade VSD switching spikes) is not monitored.",
+        "**Control Actuation Boundaries**: The system has zero physical actuation or SCADA write capability and cannot start, stop, or adjust VSD frequencies.",
+        "**Safety Governance**: AI diagnoses are advisory and do not replace formal Management of Change (MOC) or hazardous work permit sign-offs by certified field engineers.",
+        "**Reservoir Modeling Scope**: The Copilot focuses on ESP downhole asset health and wellhead hydraulics; multi-phase reservoir numerical simulations (e.g. Eclipse, CMG) are outside the APM database boundary."
+    ]
+
+    md = (
+        "# [ESP APM] System Limitations & Known Disclosures\n\n"
+        "**Policy**: Radical Transparency & Engineering Integrity\n\n"
+        + "\n".join([f"- {lim}" for lim in limitations]) + "\n\n"
+        "---\n"
+        "> *All limitations are enforced by system design to guarantee industrial safety and physical protection.*\n"
+    )
+
+    return SelfKnowledgeReport(
+        intent="10.6 Limitations",
+        identity_title="ESP APM System Limitations",
+        version="2.4.0",
+        limitations=limitations,
+        markdown_report=md,
+    )
+
+
 def route_query_hybrid(
     question: str,
     conversation_history: list[dict[str, Any]] | None = None,
 ) -> HybridRouteResult:
-    """Multi-tier hybrid router: Tier 0 Domain 2 Comparative / Entity Regex -> Tier 0.E Antecedent & Conceptual -> Tier 1 Qwen LLM -> Tier Fallback."""
+    """Multi-tier hybrid router: Tier 0 Domain 10 Self-Knowledge -> Tier 0 Domain 2 Comparative / Entity Regex -> Tier 0.E Antecedent & Conceptual -> Tier 1 Qwen LLM -> Tier Fallback."""
     q_lower = question.lower().strip()
+
+    # Normalize informal chat abbreviations (e.g. "u" -> "you", "ur" -> "your", "r" -> "are", "cant" -> "can't")
+    q_lower = re.sub(r"\bu\b", "you", q_lower)
+    q_lower = re.sub(r"\bur\b", "your", q_lower)
+    q_lower = re.sub(r"\br\b", "are", q_lower)
+    q_lower = re.sub(r"\bcant\b", "can't", q_lower)
+    q_lower = re.sub(r"\bwats\b|\bwhat's\b", "what is", q_lower)
+    q_lower = re.sub(r"\bwho's\b|\bwhos\b", "who is", q_lower)
+    q_lower = re.sub(r"\bpls\b|\bplz\b", "please", q_lower)
+    q_lower = re.sub(r"\bthx\b|\bthanx\b", "thanks", q_lower)
+
+    # =========================================================================
+    # TIER 0.SELF_KNOWLEDGE: Domain 10 Self-Knowledge, Boundaries & Identity Routing
+    # =========================================================================
+
+    # 10.3 Boundary & Physical Actuation Refusals
+    boundary_triggers = [
+        "what can't you do", "what cant you do", "can't do", "cant do", "what are you unable",
+        "can you start", "start the pump", "stop the pump", "can you stop", "control the pump",
+        "control the well", "change frequency", "change speed", "actuate", "remote control",
+        "turn on", "turn off", "shut down", "shutdown", "power on", "power off", "run the pump",
+        "trip the pump", "open choke", "close choke", "increase frequency", "decrease frequency",
+        "set frequency", "modulate frequency", "vsd write", "scada write",
+        "system boundary", "system boundaries", "your boundaries", "what is outside your scope"
+    ]
+    if any(bt in q_lower for bt in boundary_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_BOUNDARIES,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # 10.4 Fleet Scope
+    scope_triggers = [
+        "which wells do you know", "which wells do you monitor", "what wells do you know",
+        "what wells do you monitor", "list your wells", "list all wells", "fleet scope",
+        "scope of fleet", "scope of wells", "wells you know", "wells you cover",
+        "coverage of wells", "what clusters are monitored", "which clusters do you know",
+        "which wells are in your scope", "wells in scope", "monitored asset scope"
+    ]
+    if any(st in q_lower for st in scope_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_FLEET_SCOPE,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # 10.6 Limitations & Disclosures
+    limitations_triggers = [
+        "what are your limitations", "your limitations", "what limitations", "what is missing",
+        "what are you lacking", "what data is missing", "honest acknowledgment",
+        "limitations of the system", "blind spots", "known limitations"
+    ]
+    if any(lt in q_lower for lt in limitations_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_LIMITATIONS,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # 10.5 Tasks & Objectives List
+    tasks_triggers = [
+        "what tasks can you handle", "what tasks do you handle", "tasks you can do",
+        "tasks you can handle", "supported workflows", "what workflows", "what tasks",
+        "tasks list", "objective list", "what objectives"
+    ]
+    if any(tt in q_lower for tt in tasks_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_TASKS,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # 10.2 Capabilities List
+    cap_triggers = [
+        "what can you do", "what are your capabilities", "your capabilities",
+        "list your capabilities", "show capabilities", "what features do you have",
+        "what are your features", "capabilities list", "help commands", "what functions"
+    ]
+    if any(ct in q_lower for ct in cap_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_CAPABILITIES,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # 10.1 Agent Identity
+    identity_triggers = [
+        "what are you", "who are you", "what is your role", "what are your functions",
+        "introduce yourself", "tell me about yourself", "explain your purpose",
+        "explain what you are", "about you", "what is this system", "who created you"
+    ]
+    if any(it in q_lower for it in identity_triggers):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SELF_IDENTITY,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
 
     # 1. Extract Well IDs & Event ID
     all_wells = extract_all_well_ids(question)
@@ -3206,8 +3573,9 @@ def route_query_hybrid(
                         "Classify the user query into ONE of these intents: "
                         "KNOWLEDGE (petroleum engineering manuals, gas lock, bearing wear, electrical, standards), "
                         "FLEET_INVENTORY (wells count, clusters), "
-                        "CHAT (greetings). "
-                        "Return ONLY valid JSON: {\"intent\": \"KNOWLEDGE\"|\"FLEET_INVENTORY\"|\"CHAT\", \"topic\": \"extracted topic\"}"
+                        "CHAT (clear greetings like hi, hello, how are you), "
+                        "AMBIGUOUS (unclear, ambiguous, or unclassified requests). "
+                        "Return ONLY valid JSON: {\"intent\": \"KNOWLEDGE\"|\"FLEET_INVENTORY\"|\"CHAT\"|\"AMBIGUOUS\", \"topic\": \"extracted topic\"}"
                     ),
                 },
                 {"role": "user", "content": question},
@@ -3215,23 +3583,35 @@ def route_query_hybrid(
             resp = llm_client.chat(prompt, json_mode=True)
             if resp.get("content"):
                 data = llm_client.parse_json(resp["content"])
-                if data and "intent" in data:
-                    intent_str = str(data["intent"]).upper()
-                    if intent_str in ESPIntentEnum.__members__:
-                        return HybridRouteResult(
-                            intent=ESPIntentEnum(intent_str),
-                            entity=data.get("topic") or question,
-                            confidence=0.85,
-                            routing_tier="TIER_1_LLM",
-                        )
+                if data:
+                    intent_val = data.get("intent") or data.get("classification")
+                    if intent_val:
+                        intent_str = str(intent_val).upper()
+                        if intent_str != "AMBIGUOUS" and intent_str in ESPIntentEnum.__members__:
+                            return HybridRouteResult(
+                                intent=ESPIntentEnum(intent_str),
+                                entity=data.get("topic") or question,
+                                confidence=0.85,
+                                routing_tier="TIER_1_LLM",
+                            )
         except Exception as e:
             logger.warning(f"Tier 1 LLM classification failed: {e}")
 
-    # TIER 2: Safe Fallback to Knowledge Base Search
+    # TIER 2: Human-in-the-Loop (HITL) Clarification Fallback
+    # When a query cannot be deterministically matched or classified by LLM, prompt the operator for clarification
     return HybridRouteResult(
-        intent=ESPIntentEnum.KNOWLEDGE,
-        entity=question,
-        confidence=0.75,
-        routing_tier="TIER_FALLBACK",
+        intent=ESPIntentEnum.CHAT,
+        entity=None,
+        confidence=0.50,
+        routing_tier="TIER_2_HITL_FALLBACK",
+        needs_clarification=True,
+        clarification_question="I could not determine the exact operational or engineering intent of your query. Could you please clarify your request, or select an operational action below?",
+        suggested_options=[
+            "Show fleet inventory",
+            "Fleet triage ranking",
+            "What can you do?",
+            "What causes gas locking?",
+            "Compare Cluster 15 vs Cluster 4",
+        ],
     )
 

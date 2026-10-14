@@ -1,0 +1,319 @@
+{
+  "summary": {
+    "total": 11,
+    "passed": 11,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "DOM10-01",
+      "category": "10.1 Agent Identity",
+      "query": "What are you?",
+      "status": "PASS",
+      "elapsed_s": 2.11,
+      "answer_snippet": "# [ESP APM] System Identity & Architecture Specification  **Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics **Architecture**: Physics-informed...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What can't you do?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-02",
+      "category": "10.2 Capability List",
+      "query": "What can you do?",
+      "status": "PASS",
+      "elapsed_s": 2.11,
+      "answer_snippet": "# [ESP APM] System Capability Manifest  **System Version**: `2.4.0` | **Engine**: Hybrid Semantic & Physics Decision Engine  ### \u2022 Fleet Operational Surveillance (`DOMAIN_1`) - **Scope**: Real-time pr...",
+      "citations_count": 1,
+      "suggested_options": [
+        "Show fleet inventory",
+        "Compare Cluster 15 vs Cluster 4",
+        "What can't you do?"
+      ],
+      "warnings": [],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-03",
+      "category": "10.3 Boundary Declaration",
+      "query": "What can't you do?",
+      "status": "PASS",
+      "elapsed_s": 2.12,
+      "answer_snippet": "# [ESP APM] Operational Boundaries & Safety Constraints  **Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`  | Category | Boundary Restriction | Operatio...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What are your limitations?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [
+        "Safety Constraint: Physical control commands are blocked by system architecture."
+      ],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-04",
+      "category": "10.3 Physical Control Refusal",
+      "query": "Can you start the pump for well FS-017?",
+      "status": "PASS",
+      "elapsed_s": 2.11,
+      "answer_snippet": "# [ESP APM] Operational Boundaries & Safety Constraints  **Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`  | Category | Boundary Restriction | Operatio...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What are your limitations?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [
+        "Safety Constraint: Physical control commands are blocked by system architecture."
+      ],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-04B",
+      "category": "10.3 Physical Control Refusal (Turn On)",
+      "query": "Can you turn on the pump for well FS-017?",
+      "status": "PASS",
+      "elapsed_s": 2.09,
+      "answer_snippet": "# [ESP APM] Operational Boundaries & Safety Constraints  **Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`  | Category | Boundary Restriction | Operatio...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What are your limitations?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [
+        "Safety Constraint: Physical control commands are blocked by system architecture."
+      ],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-04C",
+      "category": "10.3 Physical Control Refusal (Shut Down)",
+      "query": "Shut down well FS-017",
+      "status": "PASS",
+      "elapsed_s": 2.11,
+      "answer_snippet": "# [ESP APM] Operational Boundaries & Safety Constraints  **Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`  | Category | Boundary Restriction | Operatio...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What are your limitations?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [
+        "Safety Constraint: Physical control commands are blocked by system architecture."
+      ],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-05",
+      "category": "10.4 Fleet Scope",
+      "query": "Which wells do you know about?",
+      "status": "PASS",
+      "elapsed_s": 12.92,
+      "answer_snippet": "# [ESP APM] Monitored Fleet Scope  **Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`) | **Total Fleet**: `10 Monitored Assets`  ### Operational Rollup - **Active Gathering Stat...",
+      "citations_count": 1,
+      "suggested_options": [
+        "Show total fleet production",
+        "Fleet triage ranking",
+        "Compare Cluster 15 vs Cluster 4"
+      ],
+      "warnings": [],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-06",
+      "category": "10.5 Objective List / Tasks",
+      "query": "What tasks can you handle?",
+      "status": "PASS",
+      "elapsed_s": 2.11,
+      "answer_snippet": "# [ESP APM] Supported Tasks & Operational Workflows  **Purpose**: Standard Operating Procedures (SOP) supported by the Copilot engine  1. **Trip Root Cause Analysis**: Automated 24h & \u00b12h waveform fea...",
+      "citations_count": 1,
+      "suggested_options": [
+        "Executive morning briefing",
+        "Fleet triage ranking",
+        "What can't you do?"
+      ],
+      "warnings": [],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "DOM10-07",
+      "category": "10.6 Limitations & Disclosures",
+      "query": "What are your limitations?",
+      "status": "PASS",
+      "elapsed_s": 2.1,
+      "answer_snippet": "# [ESP APM] System Limitations & Known Disclosures  **Policy**: Radical Transparency & Engineering Integrity  - **Sensor Coverage Limitations**: Downhole sensor telemetry captures electrical (current/...",
+      "citations_count": 1,
+      "suggested_options": [
+        "What can you do?",
+        "What are your boundaries?",
+        "Which wells do you know about?"
+      ],
+      "warnings": [],
+      "structured_data_keys": [
+        "intent",
+        "identity_title",
+        "version",
+        "environment",
+        "safety_contract",
+        "fleet_scope_summary",
+        "assets",
+        "capabilities",
+        "boundaries",
+        "limitations",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "REG-DOM1",
+      "category": "Regression: Domain 1 Fleet Surveillance",
+      "query": "Show total fleet production",
+      "status": "PASS",
+      "elapsed_s": 10.0,
+      "answer_snippet": "# [ESP APM] Fleet Production & Deferment Summary  **Fleet Availability**: `40.0%` (4/10 Online) | **Production Efficiency**: `68.1%`  ### 1. AGGREGATE FLEET OUTPUT - **Current Active Gross Liquid**: *...",
+      "citations_count": 1,
+      "suggested_options": [
+        "Fleet Triage Ranking",
+        "Executive Summary",
+        "Fleet Anomalies",
+        "Fleet Status"
+      ],
+      "warnings": [
+        "Fleet Deferment: 742.8 BOPD currently shut in across 6 offline wells."
+      ],
+      "structured_data_keys": [
+        "total_wells",
+        "running_wells_count",
+        "tripped_wells_count",
+        "availability_factor_pct",
+        "current_liquid_rate_bpd",
+        "current_net_oil_bpd",
+        "average_water_cut_pct",
+        "deferred_liquid_rate_bpd",
+        "deferred_net_oil_bpd",
+        "fleet_production_efficiency_pct",
+        "cluster_production_breakdown",
+        "markdown_report"
+      ]
+    },
+    {
+      "id": "REG-DOM2",
+      "category": "Regression: Domain 2 Well Comparison",
+      "query": "Compare well FS-017 vs FS-040",
+      "status": "PASS",
+      "elapsed_s": 2.41,
+      "answer_snippet": "# [ESP APM] Comparative Well Analysis: FS-017 vs FS-040  **Source**: PostgreSQL Server 184 (`opg_well_telemetry`, `events`, `asset_registry`)  ### 1. SIDE-BY-SIDE TELEMETRY & BASELINE COMPARISON  | **...",
+      "citations_count": 1,
+      "suggested_options": [
+        "Diagnose FS-017",
+        "Diagnose FS-040",
+        "Fleet Inventory"
+      ],
+      "warnings": [
+        "Cross-Asset Analysis: Evaluated live telemetry across 2 wells (FS-017, FS-040)."
+      ],
+      "structured_data_keys": []
+    }
+  ]
+}

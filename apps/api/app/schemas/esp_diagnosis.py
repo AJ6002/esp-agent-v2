@@ -104,6 +104,12 @@ class ESPIntentEnum(str, Enum):
     PEER_BENCHMARK = "PEER_BENCHMARK"
     EVENT_BEFORE_AFTER = "EVENT_BEFORE_AFTER"
     FLEET_RANKING = "FLEET_RANKING"
+    SELF_IDENTITY = "SELF_IDENTITY"
+    SELF_CAPABILITIES = "SELF_CAPABILITIES"
+    SELF_BOUNDARIES = "SELF_BOUNDARIES"
+    SELF_FLEET_SCOPE = "SELF_FLEET_SCOPE"
+    SELF_TASKS = "SELF_TASKS"
+    SELF_LIMITATIONS = "SELF_LIMITATIONS"
     PRODUCTION = "PRODUCTION"
     KNOWLEDGE = "KNOWLEDGE"
     WORK_ORDER_DISPATCH = "WORK_ORDER_DISPATCH"
@@ -336,5 +342,44 @@ class FleetRankingReport(BaseModel):
     fleet_median: float
     leaderboard: list[FleetRankItem]
     markdown_report: str
+
+
+# =========================================================================
+# DOMAIN 10: SELF-KNOWLEDGE & IDENTITY SCHEMAS
+# =========================================================================
+
+class MonitoredAssetScope(BaseModel):
+    well_id: str
+    cluster: str
+    motor_hp: float
+    operating_state: str
+
+
+class DomainCapabilityItem(BaseModel):
+    domain_id: str
+    name: str
+    description: str
+    example_queries: list[str]
+
+
+class SystemBoundaryItem(BaseModel):
+    category: str  # "CONTROL", "SAFETY", "INTEGRATION", "SENSORS"
+    boundary: str
+    rationale: str
+
+
+class SelfKnowledgeReport(BaseModel):
+    intent: str
+    identity_title: str
+    version: str = "2.4.0"
+    environment: str = "PostgreSQL Server 184 (Production APM)"
+    safety_contract: str = "READ_ONLY_DECISION_SUPPORT"
+    fleet_scope_summary: dict[str, Any] | None = None
+    assets: list[MonitoredAssetScope] = []
+    capabilities: list[DomainCapabilityItem] = []
+    boundaries: list[SystemBoundaryItem] = []
+    limitations: list[str] = []
+    markdown_report: str
+
 
 

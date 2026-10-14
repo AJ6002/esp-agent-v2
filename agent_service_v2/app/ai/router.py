@@ -12,6 +12,11 @@ from app.schemas.esp_diagnosis import (
 )
 from app.services.esp_diagnosis_service import (
     compare_multiple_wells,
+    compare_gathering_clusters,
+    compare_well_historical,
+    benchmark_well_against_peers,
+    compare_event_before_after,
+    rank_fleet_by_metric,
     diagnose_esp_event,
     get_fleet_alarm_timeline,
     get_fleet_anomaly_surfacing,
@@ -19,6 +24,12 @@ from app.services.esp_diagnosis_service import (
     get_fleet_inventory_status,
     get_fleet_production_summary,
     get_fleet_triage_ranking,
+    get_self_identity,
+    get_self_capabilities,
+    get_self_boundaries,
+    get_self_fleet_scope,
+    get_self_tasks,
+    get_self_limitations,
     get_well_health_status,
     get_well_historical_analysis,
     get_well_production_metrics,
@@ -257,6 +268,139 @@ def ask_agent(
             "confidence": 0.95,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {target_well}", "Fleet Status"],
+        }
+
+    # 8.1 Gathering Cluster Comparison (Domain 2)
+    if route.intent == ESPIntentEnum.CLUSTER_COMPARE:
+        c1 = route.entities[0] if len(route.entities) > 0 else "15"
+        c2 = route.entities[1] if len(route.entities) > 1 else "4"
+        comp_res = compare_gathering_clusters(c1, c2)
+        return {
+            "intent": "CLUSTER_COMPARE",
+            "markdown_text": comp_res.markdown_report,
+            "structured_data": comp_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Compare Cluster 15 vs Cluster 3", "Show total fleet production", "Fleet Status"],
+        }
+
+    # 8.2 Historical Baseline Comparison (Domain 2)
+    if route.intent == ESPIntentEnum.HISTORICAL_COMPARE:
+        target_well = route.entity or well_id or "FS-004"
+        b_res = compare_well_historical(target_well)
+        return {
+            "intent": "HISTORICAL_COMPARE",
+            "markdown_text": b_res.markdown_report,
+            "structured_data": b_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": [f"Diagnose {target_well}", f"Benchmark {target_well} vs peers", "Fleet Status"],
+        }
+
+    # 8.3 Cluster Peer Benchmarking (Domain 2)
+    if route.intent == ESPIntentEnum.PEER_BENCHMARK:
+        target_well = route.entity or well_id or "FS-017"
+        peer_res = benchmark_well_against_peers(target_well)
+        return {
+            "intent": "PEER_BENCHMARK",
+            "markdown_text": peer_res.markdown_report,
+            "structured_data": peer_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": [f"Diagnose {target_well}", f"Show baseline for {target_well}", "Rank wells by vibration"],
+        }
+
+    # 8.4 Event Telemetry Comparison (Domain 2)
+    if route.intent == ESPIntentEnum.EVENT_BEFORE_AFTER:
+        ev_id = route.entity or "EV-20261012-101438-FS-017-571"
+        ev_res = compare_event_before_after(ev_id)
+        return {
+            "intent": "EVENT_BEFORE_AFTER",
+            "markdown_text": ev_res.markdown_report,
+            "structured_data": ev_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": [f"Diagnose event {ev_id}", "Fleet Status"],
+        }
+
+    # 8.5 Fleet Leaderboards & Metric Ranking (Domain 2)
+    if route.intent == ESPIntentEnum.FLEET_RANKING:
+        metric = route.entity or "vibration"
+        rank_res = rank_fleet_by_metric(metric)
+        return {
+            "intent": "FLEET_RANKING",
+            "markdown_text": rank_res.markdown_report,
+            "structured_data": rank_res.dict(),
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": ["Rank wells by water cut", "Rank wells by motor current", "Fleet Triage"],
+        }
+
+    # 8.6 Domain 10: Self-Knowledge & Identity Dispatches
+    if route.intent == ESPIntentEnum.SELF_IDENTITY:
+        id_res = get_self_identity()
+        return {
+            "intent": "SELF_IDENTITY",
+            "markdown_text": id_res.markdown_report,
+            "structured_data": id_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["What can you do?", "What can't you do?", "Which wells do you know about?"],
+        }
+
+    if route.intent == ESPIntentEnum.SELF_CAPABILITIES:
+        cap_res = get_self_capabilities()
+        return {
+            "intent": "SELF_CAPABILITIES",
+            "markdown_text": cap_res.markdown_report,
+            "structured_data": cap_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["Show fleet inventory", "Compare Cluster 15 vs Cluster 4", "What can't you do?"],
+        }
+
+    if route.intent == ESPIntentEnum.SELF_BOUNDARIES:
+        bnd_res = get_self_boundaries()
+        return {
+            "intent": "SELF_BOUNDARIES",
+            "markdown_text": bnd_res.markdown_report,
+            "structured_data": bnd_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["What can you do?", "What are your limitations?", "Which wells do you know about?"],
+        }
+
+    if route.intent == ESPIntentEnum.SELF_FLEET_SCOPE:
+        scope_res = get_self_fleet_scope()
+        return {
+            "intent": "SELF_FLEET_SCOPE",
+            "markdown_text": scope_res.markdown_report,
+            "structured_data": scope_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["Show total fleet production", "Fleet triage ranking", "Compare Cluster 15 vs Cluster 4"],
+        }
+
+    if route.intent == ESPIntentEnum.SELF_TASKS:
+        tasks_res = get_self_tasks()
+        return {
+            "intent": "SELF_TASKS",
+            "markdown_text": tasks_res.markdown_report,
+            "structured_data": tasks_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["Executive morning briefing", "Fleet triage ranking", "What can't you do?"],
+        }
+
+    if route.intent == ESPIntentEnum.SELF_LIMITATIONS:
+        lim_res = get_self_limitations()
+        return {
+            "intent": "SELF_LIMITATIONS",
+            "markdown_text": lim_res.markdown_report,
+            "structured_data": lim_res.dict(),
+            "confidence": 1.0,
+            "needs_clarification": False,
+            "suggested_options": ["What can you do?", "What are your boundaries?", "Which wells do you know about?"],
         }
 
     # 9. Petroleum Engineering Knowledge RAG

@@ -524,22 +524,28 @@ def ask(
         benchmark_well_against_peers,
         compare_event_before_after,
         rank_fleet_by_metric,
+        get_self_identity,
+        get_self_capabilities,
+        get_self_boundaries,
+        get_self_fleet_scope,
+        get_self_tasks,
+        get_self_limitations,
     )
     from app.schemas.esp_diagnosis import DiagnoseEventRequest, ESPIntentEnum
 
     route = route_query_hybrid(question, conversation_history=conversation_history)
 
-    # 1. HITL Clarification Needed (Missing Well/Event entity on ambiguous diagnostic question)
+    # 1. HITL Clarification Needed (Missing Well/Event entity or Tier 2 Ambiguity Fallback)
     if route.needs_clarification:
         return AskResult(
             answer=(
                 f"### [ESP APM] Operational Clarification Required\n\n"
                 f"{route.clarification_question or 'Please specify which well or event you want to inspect.'}\n\n"
-                f"Select an asset below or type the Well ID directly:"
+                f"Select an option below or refine your query directly:"
             ),
             confidence=route.confidence,
             citations=[],
-            warnings=["Operational Context Ambiguous: Please choose an asset option to focus the diagnostic engine."],
+            warnings=["Operational Context Ambiguous: Please choose an option or refine your query to focus the copilot engine."],
             needs_clarification=True,
             clarification_question=route.clarification_question,
             suggested_options=route.suggested_options,
@@ -942,6 +948,181 @@ def ask(
             )
         except Exception as e:
             logger.warning(f"Fleet ranking dispatch failed: {e}")
+
+    # 3.11. Domain 10: Self-Knowledge & Identity Dispatches
+    if route.intent == ESPIntentEnum.SELF_IDENTITY:
+        try:
+            id_res = get_self_identity()
+            citations = [
+                Citation(
+                    source_type="system_identity_contract",
+                    source_id=1,
+                    title="ESP APM System Identity & Architecture Specification",
+                    excerpt="Autonomous Industrial AI Copilot operating in strict read-only decision support mode on Server 184",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_identity", question, id_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=id_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["What can you do?", "What can't you do?", "Which wells do you know about?"],
+                is_mock=False,
+                structured_data=id_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-identity dispatch failed: {e}")
+
+    if route.intent == ESPIntentEnum.SELF_CAPABILITIES:
+        try:
+            cap_res = get_self_capabilities()
+            citations = [
+                Citation(
+                    source_type="system_capability_manifest",
+                    source_id=1,
+                    title="ESP APM Operational Capabilities Catalog",
+                    excerpt="5 integrated operational domains spanning surveillance, comparative analytics, RCA, and work orders",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_capabilities", question, cap_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=cap_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Show fleet inventory", "Compare Cluster 15 vs Cluster 4", "What can't you do?"],
+                is_mock=False,
+                structured_data=cap_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-capabilities dispatch failed: {e}")
+
+    if route.intent == ESPIntentEnum.SELF_BOUNDARIES:
+        try:
+            bnd_res = get_self_boundaries()
+            citations = [
+                Citation(
+                    source_type="system_safety_boundaries",
+                    source_id=1,
+                    title="ESP APM Operational Boundaries & Safety Constraints",
+                    excerpt="Physical control and VSD actuation blocked; read-only decision support advisory governance",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_boundaries", question, bnd_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=bnd_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=["Safety Constraint: Physical control commands are blocked by system architecture."],
+                needs_clarification=False,
+                suggested_options=["What can you do?", "What are your limitations?", "Which wells do you know about?"],
+                is_mock=False,
+                structured_data=bnd_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-boundaries dispatch failed: {e}")
+
+    if route.intent == ESPIntentEnum.SELF_FLEET_SCOPE:
+        try:
+            scope_res = get_self_fleet_scope()
+            citations = [
+                Citation(
+                    source_type="postgresql_asset_registry",
+                    source_id=1,
+                    title="Monitored Fleet Scope Registry",
+                    excerpt=f"10 monitored ESP assets across 3 gathering stations in esp_apm_db",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_fleet_scope", question, scope_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=scope_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Show total fleet production", "Fleet triage ranking", "Compare Cluster 15 vs Cluster 4"],
+                is_mock=False,
+                structured_data=scope_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-fleet-scope dispatch failed: {e}")
+
+    if route.intent == ESPIntentEnum.SELF_TASKS:
+        try:
+            tasks_res = get_self_tasks()
+            citations = [
+                Citation(
+                    source_type="system_workflows_manifest",
+                    source_id=1,
+                    title="Supported Operational Workflows & Tasks",
+                    excerpt="SOP tasks including RCA, Morning Surveillance, Baseline Auditing, and Dispatch",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_tasks", question, tasks_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=tasks_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Executive morning briefing", "Fleet triage ranking", "What can't you do?"],
+                is_mock=False,
+                structured_data=tasks_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-tasks dispatch failed: {e}")
+
+    if route.intent == ESPIntentEnum.SELF_LIMITATIONS:
+        try:
+            lim_res = get_self_limitations()
+            citations = [
+                Citation(
+                    source_type="system_limitations_disclosure",
+                    source_id=1,
+                    title="System Limitations & Known Disclosures",
+                    excerpt="Sensor scope boundaries, periodic polling telemetry, and human safety governance",
+                    relevance_score=1.0,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_self_limitations", question, lim_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=lim_res.markdown_report,
+                confidence=1.0,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["What can you do?", "What are your boundaries?", "Which wells do you know about?"],
+                is_mock=False,
+                structured_data=lim_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Self-limitations dispatch failed: {e}")
 
     # 4. Well Failure History (with Temporal Window Filter, Gap 2)
     if route.intent == ESPIntentEnum.WELL_HISTORY and route.entity:
