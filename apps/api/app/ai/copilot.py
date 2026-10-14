@@ -519,6 +519,11 @@ def ask(
         get_well_production_metrics,
         search_petroleum_kb,
         compare_multiple_wells,
+        compare_gathering_clusters,
+        compare_well_historical,
+        benchmark_well_against_peers,
+        compare_event_before_after,
+        rank_fleet_by_metric,
     )
     from app.schemas.esp_diagnosis import DiagnoseEventRequest, ESPIntentEnum
 
@@ -784,6 +789,159 @@ def ask(
             )
         except Exception as e:
             logger.warning(f"Multi-well comparison dispatch failed: {e}")
+
+    # 3.6. Gathering Cluster Comparison (Domain 2.2)
+    if route.intent == ESPIntentEnum.CLUSTER_COMPARE and route.entities and len(route.entities) >= 2:
+        try:
+            cl_res = compare_gathering_clusters(route.entities[0], route.entities[1])
+            citations = [
+                Citation(
+                    source_type="postgresql_cluster_telemetry",
+                    source_id=1,
+                    title=f"Gathering Cluster Comparative Scorecard: {cl_res.cluster_a} vs {cl_res.cluster_b}",
+                    excerpt=f"Comparative availability and production rollup between {cl_res.cluster_a} and {cl_res.cluster_b}",
+                    relevance_score=0.99,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_cluster_compare", question, cl_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=cl_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Fleet Production Summary", "Fleet Triage Ranking", "Compare FS-017 vs FS-040"],
+                is_mock=False,
+                structured_data=cl_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Cluster comparison dispatch failed: {e}")
+
+    # 3.7. Historical Baseline Comparison (Domain 2.3)
+    if route.intent == ESPIntentEnum.HISTORICAL_COMPARE and route.entity:
+        try:
+            hist_comp = compare_well_historical(route.entity)
+            citations = [
+                Citation(
+                    source_type="postgresql_historical_telemetry",
+                    source_id=1,
+                    title=f"Historical Baseline Audit: Well {route.entity}",
+                    excerpt=f"24h current sensor average compared against baseline for {route.entity}",
+                    relevance_score=0.98,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_historical_compare", question, hist_comp.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=hist_comp.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=[f"Well {route.entity} Health", f"Benchmark {route.entity} vs Peers", f"History of {route.entity}"],
+                is_mock=False,
+                structured_data=hist_comp.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Historical comparison dispatch failed: {e}")
+
+    # 3.8. Peer Group Benchmarking (Domain 2.4)
+    if route.intent == ESPIntentEnum.PEER_BENCHMARK and route.entity:
+        try:
+            peer_res = benchmark_well_against_peers(route.entity)
+            citations = [
+                Citation(
+                    source_type="postgresql_peer_telemetry",
+                    source_id=1,
+                    title=f"Peer Group Benchmarking: Well {route.entity}",
+                    excerpt=f"Target well telemetry evaluated against {peer_res.peer_count} cluster peers",
+                    relevance_score=0.98,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_peer_benchmark", question, peer_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=peer_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=[f"Well {route.entity} Health", f"Historical Baseline for {route.entity}", "Fleet Ranking by Vibration"],
+                is_mock=False,
+                structured_data=peer_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Peer benchmarking dispatch failed: {e}")
+
+    # 3.9. Before vs After Event Comparison (Domain 2.5)
+    if route.intent == ESPIntentEnum.EVENT_BEFORE_AFTER:
+        try:
+            ev_id = route.entity if (route.entity and route.entity.startswith("EV-")) else None
+            w_id = route.entity if (route.entity and not route.entity.startswith("EV-")) else None
+            ba_res = compare_event_before_after(event_id=ev_id, well_id=w_id)
+            citations = [
+                Citation(
+                    source_type="postgresql_event_telemetry",
+                    source_id=1,
+                    title=f"Before/After Event Inflection: {ba_res.event_id}",
+                    excerpt=f"2h pre-event vs post-event sensor delta for well {ba_res.well_id}",
+                    relevance_score=0.98,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_event_before_after", question, ba_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=ba_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=[f"Diagnose Event {ba_res.event_id}", f"Dispatch Work Order for {ba_res.well_id}", "Fleet Triage Ranking"],
+                is_mock=False,
+                structured_data=ba_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Before/After event comparison dispatch failed: {e}")
+
+    # 3.10. Fleet Metric Ranking & Leaderboard (Domain 2.6)
+    if route.intent == ESPIntentEnum.FLEET_RANKING:
+        try:
+            metric_target = route.entity or "vibration"
+            rank_res = rank_fleet_by_metric(metric=metric_target)
+            citations = [
+                Citation(
+                    source_type="postgresql_fleet_telemetry",
+                    source_id=1,
+                    title=f"Fleet Metric Leaderboard: {rank_res.ranking_metric}",
+                    excerpt=f"10-well ranking by {rank_res.ranking_metric} relative to fleet median",
+                    relevance_score=0.99,
+                    url=None,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_fleet_ranking", question, rank_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=rank_res.markdown_report,
+                confidence=0.98,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=["Rank Wells by Temperature", "Rank Wells by Production", "Fleet Production Summary", "Fleet Triage Ranking"],
+                is_mock=False,
+                structured_data=rank_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"Fleet ranking dispatch failed: {e}")
 
     # 4. Well Failure History (with Temporal Window Filter, Gap 2)
     if route.intent == ESPIntentEnum.WELL_HISTORY and route.entity:

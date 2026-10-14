@@ -99,6 +99,11 @@ class ESPIntentEnum(str, Enum):
     FLEET_EXECUTIVE = "FLEET_EXECUTIVE"
     FLEET_ANOMALY = "FLEET_ANOMALY"
     FLEET_TIMELINE = "FLEET_TIMELINE"
+    CLUSTER_COMPARE = "CLUSTER_COMPARE"
+    HISTORICAL_COMPARE = "HISTORICAL_COMPARE"
+    PEER_BENCHMARK = "PEER_BENCHMARK"
+    EVENT_BEFORE_AFTER = "EVENT_BEFORE_AFTER"
+    FLEET_RANKING = "FLEET_RANKING"
     PRODUCTION = "PRODUCTION"
     KNOWLEDGE = "KNOWLEDGE"
     WORK_ORDER_DISPATCH = "WORK_ORDER_DISPATCH"
@@ -269,4 +274,67 @@ class FleetAlarmTimelineReport(BaseModel):
     cluster_clustering: dict[str, int] = {}
     daily_density: list[AlarmTimeBucket] = []
     markdown_report: str
+
+
+# =========================================================================
+# DOMAIN 2: FLEET COMPARISON EXPANDED SCHEMAS
+# =========================================================================
+
+class WellComparisonReport(BaseModel):
+    wells: list[str]
+    parameters: list[dict[str, Any]]
+    markdown_report: str
+
+
+class ClusterComparisonReport(BaseModel):
+    cluster_a: str
+    cluster_b: str
+    cluster_a_metrics: dict[str, Any]
+    cluster_b_metrics: dict[str, Any]
+    deltas: dict[str, Any]
+    markdown_report: str
+
+
+class HistoricalComparisonReport(BaseModel):
+    well_id: str
+    current_window_label: str
+    baseline_window_label: str
+    comparison_table: list[dict[str, Any]]
+    markdown_report: str
+
+
+class PeerBenchmarkReport(BaseModel):
+    well_id: str
+    cluster: str
+    peer_count: int
+    benchmark_table: list[dict[str, Any]]
+    markdown_report: str
+
+
+class EventBeforeAfterReport(BaseModel):
+    well_id: str
+    event_id: str
+    event_timestamp: str
+    trip_cause: str
+    metrics_comparison: list[dict[str, Any]]
+    markdown_report: str
+
+
+class FleetRankItem(BaseModel):
+    rank: int
+    well_id: str
+    cluster: str
+    metric_name: str
+    metric_value: float
+    operating_state: str
+    deviation_vs_median_pct: float
+
+
+class FleetRankingReport(BaseModel):
+    ranking_metric: str
+    sort_order: str
+    fleet_median: float
+    leaderboard: list[FleetRankItem]
+    markdown_report: str
+
 

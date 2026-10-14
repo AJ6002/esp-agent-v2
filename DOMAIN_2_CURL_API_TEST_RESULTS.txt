@@ -1,0 +1,556 @@
+====================================================================================================
+ESP APM INDUSTRIAL COPILOT — DOMAIN 2 (FLEET COMPARISON) CURL API TEST REPORT
+====================================================================================================
+Timestamp: 2026-10-14 07:09:20 UTC
+Target Endpoint: http://localhost:8000/api/v1/copilot/ask
+Data Source: PostgreSQL Server 184 (esp_apm_db) [Read-Only]
+LLM Engine: Local Server 134 (http://192.168.1.134:8080/v1)
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-01] 2.1 Well-to-Well Comparison
+Description: Side-by-side comparative telemetry and limit envelope across two specific assets
+Status: PASS | HTTP Code: 200 | Elapsed: 0.483774s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Compare well FS-017 vs FS-040"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Compare well FS-017 vs FS-040"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 0.483774 seconds
+- Needs Clarification: False
+- Suggested Options: ['Diagnose FS-017', 'Diagnose FS-040', 'Fleet Inventory']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Comparative Well Analysis: FS-017 vs FS-040
+
+**Source**: PostgreSQL Server 184 (`opg_well_telemetry`, `events`, `asset_registry`)
+
+### 1. SIDE-BY-SIDE TELEMETRY & BASELINE COMPARISON
+
+| **Operational Parameter** | **FS-017** | **FS-040** |
+|---|--- | ---|
+| **Operating State** | `STOPPED` | `STOPPED` |
+| **Cluster** | `4` | `4` |
+| **Motor Rating** | 38.0 HP (21.0A rated) | 38.0 HP (21.0A rated) |
+| **Motor Current** | 0.0 A (0.0% load) | 0.0 A (0.0% load) |
+| **Vibration (Vx)** | **0.18 g** (limit 2.0g) | **0.18 g** (limit 2.0g) |
+| **Pump Intake Pressure (PIP)** | 405.4 PSI | 414.9 PSI |
+| **Pump Discharge Pressure (PDP)** | 408.7 PSI | 414.9 PSI |
+| **Motor Temperature** | 87.1 °C | 89.2 °C |
+| **Flow Rate (Liquid)** | 0.0 BPD (77.6% WC) | 0.0 BPD (78.0% WC) |
+| **Lifetime Trip Count** | 187 trips | 286 trips |
+| **Dominant Trip Mode** | `MOTOR_OVERLOAD` | `MOTOR_OVERLOAD` |
+
+### 2. COMPARATIVE OPERATIONAL RISK ASSESSMENT
+- **Well `FS-017`** (**CRITICAL RISK**): Asset is offline (`STOPPED`). Dominant failure mode: `MOTOR_OVERLOAD`.
+- **Well `FS-040`** (**CRITICAL RISK**): Asset is offline (`STOPPED`). Dominant failure mode: `MOTOR_OVERLOAD`.
+
+### 3. RECOMMENDED SUPERVISORY ACTION
+1. Prioritize physical vibration FFT survey and electrical phase balance inspection for assets displaying VIOLATION flags.
+2. For offline assets, review historical trip signature and require Production Engineer sign-off before VSD restart.
+
+---
+> **Engineering Notice**: *Comparative surveillance evaluated across live downhole gauges and calibrated P50 protection baselines.*
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Comparative Well Analysis: FS-017 vs FS-040\n\n**Source**: PostgreSQL Server 184 (`opg_well_telemetry`, `events`, `asset_registry`)\n\n### 1. SIDE-BY-SIDE TELEMETRY & BASELINE COMPARISON\n\n| **Operational Parameter** | **FS-017** | **FS-040** |\n|---|--- | ---|\n| **Operating State** | `STOPPED` | `STOPPED` |\n| **Cluster** | `4` | `4` |\n| **Motor Rating** | 38.0 HP (21.0A rated) | 38.0 HP (21.0A rated) |\n| **Motor Current** | 0.0 A (0.0% load) | 0.0 A (0.0% load) |\n| **Vibration (Vx)** | **0.18 g** (limit 2.0g) | **0.18 g** (limit 2.0g) |\n| **Pump Intake Pressu
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-02] 2.2 Gathering Cluster Comparison
+Description: Aggregation and mathematical delta comparison between gathering stations GCS-15 and GCS-4
+Status: PASS | HTTP Code: 200 | Elapsed: 8.827626s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Compare Cluster 15 vs Cluster 4"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Compare Cluster 15 vs Cluster 4"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 8.827626 seconds
+- Needs Clarification: False
+- Suggested Options: ['Fleet Production Summary', 'Fleet Triage Ranking', 'Compare FS-017 vs FS-040']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Gathering Cluster Comparison: Cluster 15 (GCS-15) vs Cluster 4 (GCS-4)
+
+**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`)
+
+| Metric Dimension | Cluster 15 (GCS-15) | Cluster 4 (GCS-4) | Delta (15 vs 4) |
+|---|---|---|---|
+| **Active Availability** | `1/2 Online (50.0%)` | `1/5 Online (20.0%)` | `+30.0% Availability` |
+| **Gross Liquid Output** | `352.8 BPD` | `359.6 BPD` | `-6.8 BPD` |
+| **Net Oil Production** | `78.4 BOPD` | `79.9 BOPD` | `-1.5 BOPD` |
+| **Installed Motor Power** | `403.0 HP` | `199.0 HP` | `+204.0 HP` |
+| **Average Running Vibration** | `0.180 g` | `0.182 g` | `-0.002 g` |
+| **Average Motor Temp** | `92.3 °C` | `90.8 °C` | `+1.5 °C` |
+| **Historical Trip Volume** | `2 Total Trips` | `37 Total Trips` | `-35 Trips` |
+| **Dominant Trip Mode** | `HIGH_VIBRATION` | `MOTOR_OVERLOAD` | - |
+
+*(Objective comparative metrics computed directly from PostgreSQL Server 184 sensor data).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Gathering Cluster Comparison: Cluster 15 (GCS-15) vs Cluster 4 (GCS-4)\n\n**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`)\n\n| Metric Dimension | Cluster 15 (GCS-15) | Cluster 4 (GCS-4) | Delta (15 vs 4) |\n|---|---|---|---|\n| **Active Availability** | `1/2 Online (50.0%)` | `1/5 Online (20.0%)` | `+30.0% Availability` |\n| **Gross Liquid Output** | `352.8 BPD` | `359.6 BPD` | `-6.8 BPD` |\n| **Net Oil Production** | `78.4 BOPD` | `79.9 BOPD` | `-1.5 BOPD` |\n| **Installed Motor Power** | `403.0 HP` | `199.0 HP` | `+204.0 HP` |\n
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-03] 2.2 HITL Ambiguous Cluster Disambiguation
+Description: Open-ended cluster comparison prompt triggering interactive option selection
+Status: PASS | HTTP Code: 200 | Elapsed: 0.210079s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Compare the clusters"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Compare the clusters"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 0.210079 seconds
+- Needs Clarification: True
+- Suggested Options: ['Cluster 15 vs Cluster 4', 'Cluster 3 vs Cluster 4', 'Cluster 15 vs Cluster 3']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+### [ESP APM] Operational Clarification Required
+
+Which gathering clusters would you like to compare?
+
+Select an asset below or type the Well ID directly:
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "### [ESP APM] Operational Clarification Required\n\nWhich gathering clusters would you like to compare?\n\nSelect an asset below or type the Well ID directly:",
+  "confidence": 0.7,
+  "citations": [],
+  "warnings": [
+    "Operational Context Ambiguous: Please choose an asset option to focus the diagnostic engine."
+  ],
+  "needs_clarification": true,
+  "clarification_question": "Which gathering clusters would you like to compare?",
+  "suggested_options": [
+    "Cluster 15 vs Cluster 4",
+    "Cluster 3 vs Cluster 4",
+    "Cluster 15 vs Cluster 3"
+  ],
+  "is_mock": false,
+  "discla
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-04] 2.3 Historical Baseline Comparison
+Description: Rolling 24-hour current sensor average vs prior baseline window for target well
+Status: PASS | HTTP Code: 200 | Elapsed: 2.203099s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Show historical baseline comparison for well FS-004"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Show historical baseline comparison for well FS-004"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 2.203099 seconds
+- Needs Clarification: False
+- Suggested Options: ['Well FS-004 Health', 'Benchmark FS-004 vs Peers', 'History of FS-004']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Historical Baseline Comparison: Well `FS-004`
+
+**Source**: PostgreSQL Server 184 (`opg_well_telemetry`) | **Current Window**: `Last 24 Hours` | **Baseline Window**: `Prior Operating Baseline`
+
+| Parameter | Current (24h Avg) | Baseline (Prior Avg) | Absolute Delta (Δ) | Percentage Change (%) |
+|---|---|---|---|---|
+| **Motor Current** | `34.8 A` | `34.8 A` | `+0.0 A` | `+0.0%` |
+| **Vibration (Vx)** | `0.180 g` | `0.180 g` | `+0.000 g` | `+0.0%` |
+| **Pump Intake Pressure (PIP)** | `390.0 PSI` | `390.0 PSI` | `+0.0 PSI` | `+0.0%` |
+| **Pump Discharge Pressure (PDP)** | `1875.0 PSI` | `1875.0 PSI` | `+0.0 PSI` | `+0.0%` |
+| **Motor Temperature** | `84.0 °C` | `84.0 °C` | `+0.0 °C` | `+0.0%` |
+| **Total Liquid Rate** | `418.7 BPD` | `805.0 BPD` | `-386.3 BPD` | `-48.0%` |
+| **Water Cut** | `78.0 %` | `78.0 %` | `+0.0 %` | `+0.0%` |
+
+*(Metrics reflect true temporal changes across downhole sensor streams without diagnostic speculation).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Historical Baseline Comparison: Well `FS-004`\n\n**Source**: PostgreSQL Server 184 (`opg_well_telemetry`) | **Current Window**: `Last 24 Hours` | **Baseline Window**: `Prior Operating Baseline`\n\n| Parameter | Current (24h Avg) | Baseline (Prior Avg) | Absolute Delta (\u0394) | Percentage Change (%) |\n|---|---|---|---|---|\n| **Motor Current** | `34.8 A` | `34.8 A` | `+0.0 A` | `+0.0%` |\n| **Vibration (Vx)** | `0.180 g` | `0.180 g` | `+0.000 g` | `+0.0%` |\n| **Pump Intake Pressure (PIP)** | `390.0 PSI` | `390.0 PSI` | `+0.0 PSI` | `+0.0%` |\n| **Pump Discharge Pr
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-05] 2.4 Cluster Peer Benchmarking
+Description: Evaluates target asset against median of all other peer wells in its gathering cluster
+Status: PASS | HTTP Code: 200 | Elapsed: 10.592440s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Benchmark well FS-017 against its cluster peers"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Benchmark well FS-017 against its cluster peers"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 10.592440 seconds
+- Needs Clarification: False
+- Suggested Options: ['Well FS-017 Health', 'Historical Baseline for FS-017', 'Fleet Ranking by Vibration']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Cluster Peer Benchmark: Well `FS-017`
+
+**Gathering Cluster**: `Cluster 4` | **Peer Group**: `4 Peer Assets` | **Source**: PostgreSQL Server 184
+
+| Operating Metric | Well `FS-017` | Peer Group Median | Deviation vs Peers | Operating Status |
+|---|---|---|---|---|
+| **Vibration (Vx)** | `0.183 g` | `0.180 g` | `+1.7%` | `NOMINAL` |
+| **Motor Temperature** | `87.1 °C` | `89.4 °C` | `-2.6%` | `NOMINAL` |
+| **Pump Intake Pressure (PIP)** | `405.4 PSI` | `417.5 PSI` | `-2.9%` | `NOMINAL` |
+| **Pump Discharge Pressure (PDP)** | `408.7 PSI` | `417.5 PSI` | `-2.1%` | `NOMINAL` |
+| **Motor Current** | `0.0 A` | `0.0 A` | `+0.0%` | `NOMINAL` |
+| **Liquid Rate** | `0.0 BPD` | `0.0 BPD` | `+0.0%` | `NOMINAL` |
+| **Water Cut** | `77.6 %` | `77.9 %` | `-0.4%` | `NOMINAL` |
+
+*(Direct peer comparison evaluating target asset against synchronous operational cluster medians).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Cluster Peer Benchmark: Well `FS-017`\n\n**Gathering Cluster**: `Cluster 4` | **Peer Group**: `4 Peer Assets` | **Source**: PostgreSQL Server 184\n\n| Operating Metric | Well `FS-017` | Peer Group Median | Deviation vs Peers | Operating Status |\n|---|---|---|---|---|\n| **Vibration (Vx)** | `0.183 g` | `0.180 g` | `+1.7%` | `NOMINAL` |\n| **Motor Temperature** | `87.1 \u00b0C` | `89.4 \u00b0C` | `-2.6%` | `NOMINAL` |\n| **Pump Intake Pressure (PIP)** | `405.4 PSI` | `417.5 PSI` | `-2.9%` | `NOMINAL` |\n| **Pump Discharge Pressure (PDP)** | `408.7 PSI` | `417.5 PSI` 
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-06] 2.5 Before/After Event Telemetry
+Description: Sensor delta evaluation 2 hours prior to trip event vs 2 hours post-event
+Status: PASS | HTTP Code: 200 | Elapsed: 0.687136s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Compare telemetry before and after trip for event EV-20261012-101438-FS-017-571"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Compare telemetry before and after trip for event EV-20261012-101438-FS-017-571"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 0.687136 seconds
+- Needs Clarification: False
+- Suggested Options: ['Diagnose Event EV-20261012-101438-FS-017-571', 'Dispatch Work Order for FS-017', 'Fleet Triage Ranking']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Event Telemetry Comparison: Before vs After Trip
+
+**Event ID**: `EV-20261012-101438-FS-017-571` | **Well ID**: `FS-017` | **Trip Cause**: `OVERLOAD_SOLIDS` | **Trip Timestamp**: `2026-10-12 15:44:41`
+
+| Operational Parameter | Pre-Event (2h Running Average) | Post-Event (2h Window) | Delta (Post - Pre) |
+|---|---|---|---|
+| **Motor Current** | `36.7 A` | `0.1 A` | `-36.6 A` |
+| **Vibration (Vx)** | `0.220 g` | `0.187 g` | `-0.033 g` |
+| **Pump Intake Pressure (PIP)** | `403.8 PSI` | `404.7 PSI` | `+0.9 PSI` |
+| **Pump Discharge Pressure (PDP)** | `1910.3 PSI` | `409.4 PSI` | `-1500.9 PSI` |
+| **Motor Temperature** | `87.5 °C` | `87.1 °C` | `-0.4 °C` |
+| **Gross Liquid Rate** | `498.9 BPD` | `1.0 BPD` | `-497.9 BPD` |
+
+*(Empirical downhole telemetry anchored on trip event timestamp).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Event Telemetry Comparison: Before vs After Trip\n\n**Event ID**: `EV-20261012-101438-FS-017-571` | **Well ID**: `FS-017` | **Trip Cause**: `OVERLOAD_SOLIDS` | **Trip Timestamp**: `2026-10-12 15:44:41`\n\n| Operational Parameter | Pre-Event (2h Running Average) | Post-Event (2h Window) | Delta (Post - Pre) |\n|---|---|---|---|\n| **Motor Current** | `36.7 A` | `0.1 A` | `-36.6 A` |\n| **Vibration (Vx)** | `0.220 g` | `0.187 g` | `-0.033 g` |\n| **Pump Intake Pressure (PIP)** | `403.8 PSI` | `404.7 PSI` | `+0.9 PSI` |\n| **Pump Discharge Pressure (PDP)** | `1910.3 PSI
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-07] 2.6 Fleet Ranking: Vibration
+Description: Objective 10-well vibration leaderboard (#1 to #10) with deviation vs fleet median
+Status: PASS | HTTP Code: 200 | Elapsed: 7.713239s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Rank wells by vibration"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Rank wells by vibration"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 7.713239 seconds
+- Needs Clarification: False
+- Suggested Options: ['Rank Wells by Temperature', 'Rank Wells by Production', 'Fleet Production Summary', 'Fleet Triage Ranking']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Fleet Ranking: Vibration (Vx Peak)
+
+**Fleet Median Vibration (Vx Peak)**: `0.180 g` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Vibration (Vx Peak) (g) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FS-017` | Cluster 4 | **`0.183 g`** | `STOPPED` | `+1.6%` |
+| #2 | `FS-013` | Cluster 3 | **`0.182 g`** | `STOPPED` | `+1.1%` |
+| #3 | `FS-023` | Cluster 4 | **`0.182 g`** | `RUNNING` | `+1.0%` |
+| #4 | `FNW-001` | Cluster 15 | `0.181 g` | `STOPPED` | `+0.5%` |
+| #5 | `FS-016` | Cluster 4 | `0.181 g` | `STOPPED` | `+0.3%` |
+| #6 | `FWS-001` | Cluster 15 | `0.180 g` | `RUNNING` | `-0.3%` |
+| #7 | `FS-040` | Cluster 4 | `0.179 g` | `STOPPED` | `-0.6%` |
+| #8 | `FS-047` | Cluster 4 | `0.177 g` | `STOPPED` | `-1.6%` |
+| #9 | `FS-006` | Cluster 3 | `0.177 g` | `RUNNING` | `-1.7%` |
+| #10 | `FS-004` | Cluster 3 | `0.175 g` | `RUNNING` | `-3.1%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Fleet Ranking: Vibration (Vx Peak)\n\n**Fleet Median Vibration (Vx Peak)**: `0.180 g` | **Source**: `opg_well_telemetry` on Server 184\n\n| Rank | Well ID | Cluster | Vibration (Vx Peak) (g) | Operating State | Deviation vs Median |\n|---|---|---|---|---|---|\n| #1 | `FS-017` | Cluster 4 | **`0.183 g`** | `STOPPED` | `+1.6%` |\n| #2 | `FS-013` | Cluster 3 | **`0.182 g`** | `STOPPED` | `+1.1%` |\n| #3 | `FS-023` | Cluster 4 | **`0.182 g`** | `RUNNING` | `+1.0%` |\n| #4 | `FNW-001` | Cluster 15 | `0.181 g` | `STOPPED` | `+0.5%` |\n| #5 | `FS-016` | Cluster 4 | `0.181 g
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-08] 2.6 Fleet Ranking: Production
+Description: Objective 10-well gross liquid production leaderboard (#1 to #10)
+Status: PASS | HTTP Code: 200 | Elapsed: 7.718599s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Top producing wells across the fleet"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Top producing wells across the fleet"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 7.718599 seconds
+- Needs Clarification: False
+- Suggested Options: ['Rank Wells by Temperature', 'Rank Wells by Production', 'Fleet Production Summary', 'Fleet Triage Ranking']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Fleet Ranking: Gross Liquid Rate
+
+**Fleet Median Gross Liquid Rate**: `0.0 BPD` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Gross Liquid Rate (BPD) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FS-006` | Cluster 3 | **`372.4 BPD`** | `RUNNING` | `+10202639.7%` |
+| #2 | `FS-004` | Cluster 3 | **`367.0 BPD`** | `RUNNING` | `+10054694.5%` |
+| #3 | `FS-023` | Cluster 4 | **`359.6 BPD`** | `RUNNING` | `+9851954.8%` |
+| #4 | `FWS-001` | Cluster 15 | `352.8 BPD` | `RUNNING` | `+9665653.4%` |
+| #5 | `FS-013` | Cluster 3 | `0.0 BPD` | `STOPPED` | `+17.8%` |
+| #6 | `FS-040` | Cluster 4 | `0.0 BPD` | `STOPPED` | `-17.8%` |
+| #7 | `FS-047` | Cluster 4 | `0.0 BPD` | `STOPPED` | `-50.7%` |
+| #8 | `FS-016` | Cluster 4 | `0.0 BPD` | `STOPPED` | `-67.1%` |
+| #9 | `FS-017` | Cluster 4 | `0.0 BPD` | `STOPPED` | `-89.0%` |
+| #10 | `FNW-001` | Cluster 15 | `0.0 BPD` | `STOPPED` | `-100.0%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Fleet Ranking: Gross Liquid Rate\n\n**Fleet Median Gross Liquid Rate**: `0.0 BPD` | **Source**: `opg_well_telemetry` on Server 184\n\n| Rank | Well ID | Cluster | Gross Liquid Rate (BPD) | Operating State | Deviation vs Median |\n|---|---|---|---|---|---|\n| #1 | `FS-006` | Cluster 3 | **`372.4 BPD`** | `RUNNING` | `+10202639.7%` |\n| #2 | `FS-004` | Cluster 3 | **`367.0 BPD`** | `RUNNING` | `+10054694.5%` |\n| #3 | `FS-023` | Cluster 4 | **`359.6 BPD`** | `RUNNING` | `+9851954.8%` |\n| #4 | `FWS-001` | Cluster 15 | `352.8 BPD` | `RUNNING` | `+9665653.4%` |\n| #5 | `
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-09] 2.6 Fleet Ranking: Temperature
+Description: Objective 10-well motor temperature ranking (#1 to #10)
+Status: PASS | HTTP Code: 200 | Elapsed: 8.937166s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Rank wells by motor temperature"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Rank wells by motor temperature"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 8.937166 seconds
+- Needs Clarification: False
+- Suggested Options: ['Rank Wells by Temperature', 'Rank Wells by Production', 'Fleet Production Summary', 'Fleet Triage Ranking']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Fleet Ranking: Motor Temperature
+
+**Fleet Median Motor Temperature**: `86.5 °C` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Motor Temperature (°C) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FWS-001` | Cluster 15 | **`92.3 °C`** | `RUNNING` | `+6.7%` |
+| #2 | `FS-023` | Cluster 4 | **`90.8 °C`** | `RUNNING` | `+5.0%` |
+| #3 | `FS-016` | Cluster 4 | **`89.6 °C`** | `STOPPED` | `+3.6%` |
+| #4 | `FS-040` | Cluster 4 | `89.2 °C` | `STOPPED` | `+3.1%` |
+| #5 | `FS-017` | Cluster 4 | `87.1 °C` | `STOPPED` | `+0.7%` |
+| #6 | `FS-047` | Cluster 4 | `85.9 °C` | `STOPPED` | `-0.7%` |
+| #7 | `FS-013` | Cluster 3 | `85.3 °C` | `STOPPED` | `-1.3%` |
+| #8 | `FNW-001` | Cluster 15 | `85.1 °C` | `STOPPED` | `-1.6%` |
+| #9 | `FS-004` | Cluster 3 | `84.0 °C` | `RUNNING` | `-2.9%` |
+| #10 | `FS-006` | Cluster 3 | `83.1 °C` | `RUNNING` | `-3.9%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Fleet Ranking: Motor Temperature\n\n**Fleet Median Motor Temperature**: `86.5 \u00b0C` | **Source**: `opg_well_telemetry` on Server 184\n\n| Rank | Well ID | Cluster | Motor Temperature (\u00b0C) | Operating State | Deviation vs Median |\n|---|---|---|---|---|---|\n| #1 | `FWS-001` | Cluster 15 | **`92.3 \u00b0C`** | `RUNNING` | `+6.7%` |\n| #2 | `FS-023` | Cluster 4 | **`90.8 \u00b0C`** | `RUNNING` | `+5.0%` |\n| #3 | `FS-016` | Cluster 4 | **`89.6 \u00b0C`** | `STOPPED` | `+3.6%` |\n| #4 | `FS-040` | Cluster 4 | `89.2 \u00b0C` | `STOPPED` | `+3.1%` |\n| #5 | `FS-01
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-10] 2.6 Fleet Ranking: Lifetime Trips
+Description: Objective 10-well ranking by historical trip frequency from events table
+Status: PASS | HTTP Code: 200 | Elapsed: 7.595653s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Rank wells by lifetime trips"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Rank wells by lifetime trips"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 7.595653 seconds
+- Needs Clarification: False
+- Suggested Options: ['Rank Wells by Temperature', 'Rank Wells by Production', 'Fleet Production Summary', 'Fleet Triage Ranking']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+# [ESP APM] Fleet Ranking: Lifetime Trips
+
+**Fleet Median Lifetime Trips**: `2 trips` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Lifetime Trips (trips) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FS-040` | Cluster 4 | **`20 trips`** | `STOPPED` | `+900.0%` |
+| #2 | `FS-017` | Cluster 4 | **`14 trips`** | `STOPPED` | `+600.0%` |
+| #3 | `FS-013` | Cluster 3 | **`4 trips`** | `STOPPED` | `+100.0%` |
+| #4 | `FNW-001` | Cluster 15 | `2 trips` | `STOPPED` | `+0.0%` |
+| #5 | `FS-047` | Cluster 4 | `2 trips` | `STOPPED` | `+0.0%` |
+| #6 | `FS-006` | Cluster 3 | `2 trips` | `RUNNING` | `+0.0%` |
+| #7 | `FS-004` | Cluster 3 | `1 trips` | `RUNNING` | `-50.0%` |
+| #8 | `FS-016` | Cluster 4 | `1 trips` | `STOPPED` | `-50.0%` |
+| #9 | `FWS-001` | Cluster 15 | `0 trips` | `RUNNING` | `-100.0%` |
+| #10 | `FS-023` | Cluster 4 | `0 trips` | `RUNNING` | `-100.0%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*\n
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "# [ESP APM] Fleet Ranking: Lifetime Trips\n\n**Fleet Median Lifetime Trips**: `2 trips` | **Source**: `opg_well_telemetry` on Server 184\n\n| Rank | Well ID | Cluster | Lifetime Trips (trips) | Operating State | Deviation vs Median |\n|---|---|---|---|---|---|\n| #1 | `FS-040` | Cluster 4 | **`20 trips`** | `STOPPED` | `+900.0%` |\n| #2 | `FS-017` | Cluster 4 | **`14 trips`** | `STOPPED` | `+600.0%` |\n| #3 | `FS-013` | Cluster 3 | **`4 trips`** | `STOPPED` | `+100.0%` |\n| #4 | `FNW-001` | Cluster 15 | `2 trips` | `STOPPED` | `+0.0%` |\n| #5 | `FS-047` | Cluster 4 | `2 trips` |
+... [TRUNCATED FOR READABILITY] ...
+
+
+----------------------------------------------------------------------------------------------------
+TEST CASE: [CURL-DOM2-11] 2.1 HITL Ambiguous Single-Well Compare
+Description: Comparative query with single well missing comparison target triggering clarification
+Status: PASS | HTTP Code: 200 | Elapsed: 0.227416s
+----------------------------------------------------------------------------------------------------
+CURL COMMAND:
+curl -X POST "http://localhost:8000/api/v1/copilot/ask" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1...[TRUNCATED_JWT]...oTqac1DtWqypqTyw" \
+  -d '{"question": "Compare well FS-017"}'
+
+REQUEST BODY JSON:
+{
+  "question": "Compare well FS-017"
+}
+
+RESPONSE METADATA:
+- HTTP Status Code: 200
+- Response Latency: 0.227416 seconds
+- Needs Clarification: True
+- Suggested Options: ['FS-017 vs FS-040 (Cluster Peer)', 'FS-017 vs Historical Baseline', 'Benchmark FS-017 against Cluster Peers']
+
+RESPONSE BODY (FULL ANSWER TEXT / MARKDOWN REPORT):
+### [ESP APM] Operational Clarification Required
+
+What would you like to compare well FS-017 against?
+
+Select an asset below or type the Well ID directly:
+
+RAW JSON RESPONSE (TRUNCATED PREVIEW):
+{
+  "answer": "### [ESP APM] Operational Clarification Required\n\nWhat would you like to compare well FS-017 against?\n\nSelect an asset below or type the Well ID directly:",
+  "confidence": 0.6,
+  "citations": [],
+  "warnings": [
+    "Operational Context Ambiguous: Please choose an asset option to focus the diagnostic engine."
+  ],
+  "needs_clarification": true,
+  "clarification_question": "What would you like to compare well FS-017 against?",
+  "suggested_options": [
+    "FS-017 vs FS-040 (Cluster Peer)",
+    "FS-017 vs Historical Baseline",
+    "Benchmark FS-017 against Cluster Peers"
+  ],
+... [TRUNCATED FOR READABILITY] ...
+
+
+====================================================================================================
+DOMAIN 2 CURL API TEST SUMMARY SCORECARD
+====================================================================================================
+Test ID          | Capability                             | Status | HTTP  | Latency  | Length
+----------------------------------------------------------------------------------------------------
+CURL-DOM2-01     | 2.1 Well-to-Well Comparison            | PASS   | 200   | 0.483774s | 1590 chars
+CURL-DOM2-02     | 2.2 Gathering Cluster Comparison       | PASS   | 200   | 8.827626s | 954 chars
+CURL-DOM2-03     | 2.2 HITL Ambiguous Cluster Disambiguation | PASS   | 200   | 0.210079s | 154 chars
+CURL-DOM2-04     | 2.3 Historical Baseline Comparison     | PASS   | 200   | 2.203099s | 961 chars
+CURL-DOM2-05     | 2.4 Cluster Peer Benchmarking          | PASS   | 200   | 10.592440s | 884 chars
+CURL-DOM2-06     | 2.5 Before/After Event Telemetry       | PASS   | 200   | 0.687136s | 808 chars
+CURL-DOM2-07     | 2.6 Fleet Ranking: Vibration           | PASS   | 200   | 7.713239s | 1013 chars
+CURL-DOM2-08     | 2.6 Fleet Ranking: Production          | PASS   | 200   | 7.718599s | 1050 chars
+CURL-DOM2-09     | 2.6 Fleet Ranking: Temperature         | PASS   | 200   | 8.937166s | 1008 chars
+CURL-DOM2-10     | 2.6 Fleet Ranking: Lifetime Trips      | PASS   | 200   | 7.595653s | 1016 chars
+CURL-DOM2-11     | 2.1 HITL Ambiguous Single-Well Compare | PASS   | 200   | 0.227416s | 154 chars
+====================================================================================================
+FINAL VERDICT: ALL 11/11 DOMAIN 2 CURL API TESTS PASSED (100% SUCCESS RATE)
+====================================================================================================

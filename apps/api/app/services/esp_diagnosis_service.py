@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import statistics
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -18,23 +19,30 @@ from app.schemas.esp_diagnosis import (
     ActiveWellSummary,
     AlarmTimeBucket,
     AnomalyWellItem,
+    ClusterComparisonReport,
     DiagnoseEventRequest,
     ESPDiagnosisResponse,
     ESPIntentEnum,
+    EventBeforeAfterReport,
     FleetAlarmTimelineReport,
     FleetAnomalyReport,
     FleetExecutiveReport,
     FleetInventoryReport,
     FleetProductionSummary,
+    FleetRankingReport,
+    FleetRankItem,
     FleetTriageReport,
+    HistoricalComparisonReport,
     HybridRouteResult,
     HypothesisItem,
     ImpactMetrics,
     NextStepItem,
+    PeerBenchmarkReport,
     PetroleumChunk,
     PhysicalDeviation,
     RecentEventSummary,
     TriageWellItem,
+    WellComparisonReport,
     WellHealthReport,
     WellProductionSummary,
 )
@@ -2269,17 +2277,620 @@ def get_well_production_metrics(well_id: str) -> WellProductionSummary:
     )
 
 
+# =========================================================================
+# DOMAIN 2: FLEET COMPARISON CORE ENGINE FUNCTIONS
+# =========================================================================
+
+def _norm_cluster_id(c_in: str) -> tuple[str, str]:
+    """Normalize input string to cluster DB id ('15', '4', '3') and human label."""
+    c_str = str(c_in).strip().upper()
+    if "15" in c_str:
+        return "15", "Cluster 15 (GCS-15)"
+    elif "4" in c_str:
+        return "4", "Cluster 4 (GCS-4)"
+    elif "3" in c_str:
+        return "3", "Cluster 3 (GCS-3)"
+    return c_str, f"Cluster {c_str}"
+
+
+def compare_gathering_clusters(cluster_a: str, cluster_b: str) -> ClusterComparisonReport:
+    """Capability 2.2: Deterministic comparison between two gathering station clusters.
+    Aggregates active availability, production rates, motor power, running vibration/temp,
+    lifetime trip volume, and dominant trip mode from PostgreSQL Server 184."""
+    db_a, label_a = _norm_cluster_id(cluster_a)
+    db_b, label_b = _norm_cluster_id(cluster_b)
+
+    with get_esp_cursor() as cur:
+        # Latest telemetry and asset metadata per cluster
+        cur.execute("""
+            WITH latest_telem AS (
+                SELECT DISTINCT ON (w.well_id)
+                    w.well_id, w.cluster, w.motor_hp,
+                    t.operating_state, t.vibration_g, t.motor_temperature_c,
+                    t.flow_rate_bpd, t.water_cut_pct
+                FROM asset_registry w
+                LEFT JOIN opg_well_telemetry t ON w.well_id = t.well_id
+                WHERE w.cluster IN (%s, %s)
+                ORDER BY w.well_id, t.timestamp DESC
+            )
+            SELECT 
+                cluster,
+                count(*) as total_wells,
+                count(*) FILTER (WHERE operating_state = 'running') as online_wells,
+                COALESCE(SUM(flow_rate_bpd) FILTER (WHERE operating_state = 'running'), 0) as gross_bpd,
+                COALESCE(SUM(flow_rate_bpd * (1 - water_cut_pct/100.0)) FILTER (WHERE operating_state = 'running'), 0) as net_bopd,
+                COALESCE(SUM(motor_hp), 0) as total_hp,
+                COALESCE(AVG(vibration_g) FILTER (WHERE operating_state = 'running'), AVG(vibration_g), 0) as avg_vib,
+                COALESCE(AVG(motor_temperature_c) FILTER (WHERE operating_state = 'running'), AVG(motor_temperature_c), 0) as avg_temp
+            FROM latest_telem
+            GROUP BY cluster;
+        """, (db_a, db_b))
+        stats_rows = {str(r[0]): r for r in cur.fetchall()}
+
+        # Trips and dominant cause from events
+        cur.execute("""
+            SELECT 
+                a.cluster,
+                count(*),
+                mode() WITHIN GROUP (ORDER BY e.trip_cause)
+            FROM events e
+            JOIN asset_registry a ON e.well_id = a.well_id
+            WHERE a.cluster IN (%s, %s) AND e.trip_cause IS NOT NULL
+            GROUP BY a.cluster;
+        """, (db_a, db_b))
+        trip_rows = {str(r[0]): r for r in cur.fetchall()}
+
+    def _extract_c(cid: str):
+        st = stats_rows.get(cid)
+        tr = trip_rows.get(cid)
+        total = int(st[1]) if st else 0
+        online = int(st[2]) if st else 0
+        gross = round(float(st[3]), 1) if st else 0.0
+        net = round(float(st[4]), 1) if st else 0.0
+        hp = round(float(st[5]), 1) if st else 0.0
+        vib = round(float(st[6]), 3) if st else 0.0
+        temp = round(float(st[7]), 1) if st else 0.0
+        avail_pct = round((online / total * 100.0), 1) if total > 0 else 0.0
+        trips = int(tr[1]) if tr else 0
+        dom_cause = str(tr[2]) if tr and tr[2] else "NONE"
+        return {
+            "total_wells": total,
+            "online_wells": online,
+            "availability_pct": avail_pct,
+            "gross_bpd": gross,
+            "net_bopd": net,
+            "total_hp": hp,
+            "avg_vibration_g": vib,
+            "avg_temp_c": temp,
+            "total_trips": trips,
+            "dominant_trip_mode": dom_cause,
+        }
+
+    m_a = _extract_c(db_a)
+    m_b = _extract_c(db_b)
+
+    deltas = {
+        "availability_delta_pct": round(m_a["availability_pct"] - m_b["availability_pct"], 1),
+        "gross_bpd_delta": round(m_a["gross_bpd"] - m_b["gross_bpd"], 1),
+        "net_bopd_delta": round(m_a["net_bopd"] - m_b["net_bopd"], 1),
+        "motor_hp_delta": round(m_a["total_hp"] - m_b["total_hp"], 1),
+        "vibration_delta_g": round(m_a["avg_vibration_g"] - m_b["avg_vibration_g"], 3),
+        "temp_delta_c": round(m_a["avg_temp_c"] - m_b["avg_temp_c"], 1),
+        "trips_delta": m_a["total_trips"] - m_b["total_trips"],
+    }
+
+    md = (
+        f"# [ESP APM] Gathering Cluster Comparison: {label_a} vs {label_b}\n\n"
+        f"**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`)\n\n"
+        f"| Metric Dimension | {label_a} | {label_b} | Delta ({db_a} vs {db_b}) |\n"
+        f"|---|---|---|---|\n"
+        f"| **Active Availability** | `{m_a['online_wells']}/{m_a['total_wells']} Online ({m_a['availability_pct']}%)` | `{m_b['online_wells']}/{m_b['total_wells']} Online ({m_b['availability_pct']}%)` | `{deltas['availability_delta_pct']:+.1f}% Availability` |\n"
+        f"| **Gross Liquid Output** | `{m_a['gross_bpd']:.1f} BPD` | `{m_b['gross_bpd']:.1f} BPD` | `{deltas['gross_bpd_delta']:+.1f} BPD` |\n"
+        f"| **Net Oil Production** | `{m_a['net_bopd']:.1f} BOPD` | `{m_b['net_bopd']:.1f} BOPD` | `{deltas['net_bopd_delta']:+.1f} BOPD` |\n"
+        f"| **Installed Motor Power** | `{m_a['total_hp']:.1f} HP` | `{m_b['total_hp']:.1f} HP` | `{deltas['motor_hp_delta']:+.1f} HP` |\n"
+        f"| **Average Running Vibration** | `{m_a['avg_vibration_g']:.3f} g` | `{m_b['avg_vibration_g']:.3f} g` | `{deltas['vibration_delta_g']:+.3f} g` |\n"
+        f"| **Average Motor Temp** | `{m_a['avg_temp_c']:.1f} °C` | `{m_b['avg_temp_c']:.1f} °C` | `{deltas['temp_delta_c']:+.1f} °C` |\n"
+        f"| **Historical Trip Volume** | `{m_a['total_trips']} Total Trips` | `{m_b['total_trips']} Total Trips` | `{deltas['trips_delta']:+d} Trips` |\n"
+        f"| **Dominant Trip Mode** | `{m_a['dominant_trip_mode']}` | `{m_b['dominant_trip_mode']}` | - |\n\n"
+        f"*(Objective comparative metrics computed directly from PostgreSQL Server 184 sensor data).*\n"
+    )
+
+    return ClusterComparisonReport(
+        cluster_a=label_a,
+        cluster_b=label_b,
+        cluster_a_metrics=m_a,
+        cluster_b_metrics=m_b,
+        deltas=deltas,
+        markdown_report=md,
+    )
+
+
+def compare_well_historical(well_id: str, baseline_days: int = 7) -> HistoricalComparisonReport:
+    """Capability 2.3: Rolling window historical baseline comparison for a target well.
+    Evaluates current 24-hour sensor averages against prior baseline telemetry."""
+    norm_w = normalize_well_id(well_id) or well_id
+
+    with get_esp_cursor() as cur:
+        cur.execute("SELECT MAX(timestamp) FROM opg_well_telemetry WHERE well_id = %s;", (norm_w,))
+        max_ts_row = cur.fetchone()
+        max_ts = max_ts_row[0] if max_ts_row else None
+        if not max_ts:
+            return HistoricalComparisonReport(
+                well_id=norm_w,
+                current_window_label="Last 24 Hours",
+                baseline_window_label=f"Prior {baseline_days}-Day Baseline",
+                comparison_table=[],
+                markdown_report=f"# [ESP APM] Historical Baseline Comparison: Well `{norm_w}`\n\nNo telemetry records found for well `{norm_w}` in Server 184.",
+            )
+
+        # 24h Current Window
+        cur.execute("""
+            SELECT 
+                AVG(motor_current_a), AVG(vibration_g), AVG(intake_pressure_psi),
+                AVG(discharge_pressure_psi), AVG(motor_temperature_c), AVG(flow_rate_bpd),
+                AVG(water_cut_pct)
+            FROM opg_well_telemetry
+            WHERE well_id = %s AND timestamp >= %s - interval '24 hours';
+        """, (norm_w, max_ts))
+        curr_row = cur.fetchone()
+
+        # Prior Baseline Window (bounded by baseline_days, defaults to 7 days prior to 24h window)
+        cur.execute("""
+            SELECT 
+                AVG(motor_current_a), AVG(vibration_g), AVG(intake_pressure_psi),
+                AVG(discharge_pressure_psi), AVG(motor_temperature_c), AVG(flow_rate_bpd),
+                AVG(water_cut_pct)
+            FROM opg_well_telemetry
+            WHERE well_id = %s 
+              AND timestamp >= %s - (interval '1 day' * %s)
+              AND timestamp < %s - interval '24 hours';
+        """, (norm_w, max_ts, baseline_days, max_ts))
+        base_row = cur.fetchone()
+
+    signals = [
+        ("Motor Current", "A", curr_row[0], base_row[0], 1),
+        ("Vibration (Vx)", "g", curr_row[1], base_row[1], 3),
+        ("Pump Intake Pressure (PIP)", "PSI", curr_row[2], base_row[2], 1),
+        ("Pump Discharge Pressure (PDP)", "PSI", curr_row[3], base_row[3], 1),
+        ("Motor Temperature", "°C", curr_row[4], base_row[4], 1),
+        ("Total Liquid Rate", "BPD", curr_row[5], base_row[5], 1),
+        ("Water Cut", "%", curr_row[6], base_row[6], 1),
+    ]
+
+    table_items = []
+    rows_md = []
+    for name, unit, c_val, b_val, prec in signals:
+        cv = round(float(c_val), prec) if c_val is not None else 0.0
+        bv = round(float(b_val), prec) if b_val is not None else 0.0
+        delta = round(cv - bv, prec)
+        pct = round((delta / bv * 100.0), 1) if bv != 0 else 0.0
+        table_items.append({
+            "metric": name,
+            "unit": unit,
+            "current_val": cv,
+            "baseline_val": bv,
+            "delta": delta,
+            "pct_change": pct,
+        })
+        fmt = f".{prec}f"
+        rows_md.append(
+            f"| **{name}** | `{cv:{fmt}} {unit}` | `{bv:{fmt}} {unit}` | `{delta:+{fmt}} {unit}` | `{pct:+.1f}%` |"
+        )
+
+    md = (
+        f"# [ESP APM] Historical Baseline Comparison: Well `{norm_w}`\n\n"
+        f"**Source**: PostgreSQL Server 184 (`opg_well_telemetry`) | **Current Window**: `Last 24 Hours` | **Baseline Window**: `Prior {baseline_days}-Day Baseline`\n\n"
+        f"| Parameter | Current (24h Avg) | Baseline (Prior Avg) | Absolute Delta (Δ) | Percentage Change (%) |\n"
+        f"|---|---|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        f"*(Metrics reflect true temporal changes across downhole sensor streams without diagnostic speculation).*\n"
+    )
+
+    return HistoricalComparisonReport(
+        well_id=norm_w,
+        current_window_label="Last 24 Hours",
+        baseline_window_label=f"Prior {baseline_days}-Day Baseline",
+        comparison_table=table_items,
+        markdown_report=md,
+    )
+
+
+def benchmark_well_against_peers(well_id: str) -> PeerBenchmarkReport:
+    """Capability 2.4: Objective benchmarking of a target well against its cluster peer group.
+    Compares live sensor streams to peer group medians and calculates mathematical deviations."""
+    norm_w = normalize_well_id(well_id) or well_id
+
+    with get_esp_cursor() as cur:
+        # Get target cluster
+        cur.execute("SELECT cluster FROM asset_registry WHERE well_id = %s;", (norm_w,))
+        c_row = cur.fetchone()
+        cluster_id = str(c_row[0]) if c_row else "4"
+
+        # Latest telemetry for all wells in the same cluster
+        cur.execute("""
+            WITH latest_telem AS (
+                SELECT DISTINCT ON (w.well_id)
+                    w.well_id, w.cluster,
+                    t.operating_state, t.vibration_g, t.motor_temperature_c,
+                    t.intake_pressure_psi, t.discharge_pressure_psi,
+                    t.motor_current_a, t.flow_rate_bpd, t.water_cut_pct
+                FROM asset_registry w
+                LEFT JOIN opg_well_telemetry t ON w.well_id = t.well_id
+                WHERE w.cluster = %s
+                ORDER BY w.well_id, t.timestamp DESC
+            )
+            SELECT well_id, operating_state, vibration_g, motor_temperature_c,
+                   intake_pressure_psi, discharge_pressure_psi, motor_current_a,
+                   flow_rate_bpd, water_cut_pct
+            FROM latest_telem;
+        """, (cluster_id,))
+        cluster_wells = cur.fetchall()
+
+    target_data = None
+    peer_data = []
+    for r in cluster_wells:
+        wid = str(r[0])
+        item = {
+            "well_id": wid,
+            "state": str(r[1] or "UNKNOWN"),
+            "vib": float(r[2]) if r[2] is not None else 0.0,
+            "temp": float(r[3]) if r[3] is not None else 0.0,
+            "pip": float(r[4]) if r[4] is not None else 0.0,
+            "pdp": float(r[5]) if r[5] is not None else 0.0,
+            "current": float(r[6]) if r[6] is not None else 0.0,
+            "flow": float(r[7]) if r[7] is not None else 0.0,
+            "wc": float(r[8]) if r[8] is not None else 0.0,
+        }
+        if wid == norm_w:
+            target_data = item
+        else:
+            peer_data.append(item)
+
+    if not target_data:
+        target_data = {"well_id": norm_w, "vib": 0.0, "temp": 0.0, "pip": 0.0, "pdp": 0.0, "current": 0.0, "flow": 0.0, "wc": 0.0}
+
+    def _med(key: str) -> float:
+        vals = [p[key] for p in peer_data]
+        return float(statistics.median(vals)) if vals else 0.0
+
+    metrics = [
+        ("Vibration (Vx)", "g", target_data["vib"], _med("vib"), 3),
+        ("Motor Temperature", "°C", target_data["temp"], _med("temp"), 1),
+        ("Pump Intake Pressure (PIP)", "PSI", target_data["pip"], _med("pip"), 1),
+        ("Pump Discharge Pressure (PDP)", "PSI", target_data["pdp"], _med("pdp"), 1),
+        ("Motor Current", "A", target_data["current"], _med("current"), 1),
+        ("Liquid Rate", "BPD", target_data["flow"], _med("flow"), 1),
+        ("Water Cut", "%", target_data["wc"], _med("wc"), 1),
+    ]
+
+    table = []
+    rows_md = []
+    for name, unit, w_val, p_med, prec in metrics:
+        wv = round(w_val, prec)
+        pm = round(p_med, prec)
+        dev = round(((wv - pm) / pm * 100.0), 1) if pm != 0 else 0.0
+        status = "ELEVATED" if dev > 15.0 else ("SUB-NOMINAL" if dev < -15.0 else "NOMINAL")
+        table.append({
+            "metric": name,
+            "unit": unit,
+            "well_val": wv,
+            "peer_median": pm,
+            "deviation_pct": dev,
+            "status": status,
+        })
+        fmt = f".{prec}f"
+        rows_md.append(
+            f"| **{name}** | `{wv:{fmt}} {unit}` | `{pm:{fmt}} {unit}` | `{dev:+.1f}%` | `{status}` |"
+        )
+
+    md = (
+        f"# [ESP APM] Cluster Peer Benchmark: Well `{norm_w}`\n\n"
+        f"**Gathering Cluster**: `Cluster {cluster_id}` | **Peer Group**: `{len(peer_data)} Peer Assets` | **Source**: PostgreSQL Server 184\n\n"
+        f"| Operating Metric | Well `{norm_w}` | Peer Group Median | Deviation vs Peers | Operating Status |\n"
+        f"|---|---|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        f"*(Direct peer comparison evaluating target asset against synchronous operational cluster medians).*\n"
+    )
+
+    return PeerBenchmarkReport(
+        well_id=norm_w,
+        cluster=f"Cluster {cluster_id}",
+        peer_count=len(peer_data),
+        benchmark_table=table,
+        markdown_report=md,
+    )
+
+
+def compare_event_before_after(event_id: str | None = None, well_id: str | None = None) -> EventBeforeAfterReport:
+    """Capability 2.5: Objective comparison of sensor telemetry 2 hours before vs after a trip event."""
+    with get_esp_cursor() as cur:
+        if event_id and str(event_id).startswith("EV-"):
+            cur.execute("""
+                SELECT event_id, well_id, timestamp, trip_cause, severity
+                FROM events
+                WHERE event_id = %s;
+            """, (event_id,))
+        else:
+            norm_w = normalize_well_id(well_id or "FS-017")
+            cur.execute("""
+                SELECT event_id, well_id, timestamp, trip_cause, severity
+                FROM events
+                WHERE well_id = %s AND trip_cause IS NOT NULL
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """, (norm_w,))
+        ev_row = cur.fetchone()
+
+        if not ev_row:
+            return EventBeforeAfterReport(
+                well_id=well_id or "UNKNOWN",
+                event_id=event_id or "NONE",
+                event_timestamp="N/A",
+                trip_cause="NO_EVENT_FOUND",
+                metrics_comparison=[],
+                markdown_report="# [ESP APM] Event Telemetry Comparison\n\nNo associated trip event found.",
+            )
+
+        ev_id, w_id, ev_ts, cause, sev = ev_row[0], str(ev_row[1]), ev_row[2], str(ev_row[3] or "UNKNOWN"), str(ev_row[4] or "CRITICAL")
+
+        # Pre 2h
+        cur.execute("""
+            SELECT AVG(motor_current_a), AVG(vibration_g), AVG(intake_pressure_psi),
+                   AVG(discharge_pressure_psi), AVG(motor_temperature_c), AVG(flow_rate_bpd)
+            FROM opg_well_telemetry
+            WHERE well_id = %s AND timestamp BETWEEN %s - interval '2 hours' AND %s;
+        """, (w_id, ev_ts, ev_ts))
+        pre = cur.fetchone()
+
+        # Post 2h
+        cur.execute("""
+            SELECT AVG(motor_current_a), AVG(vibration_g), AVG(intake_pressure_psi),
+                   AVG(discharge_pressure_psi), AVG(motor_temperature_c), AVG(flow_rate_bpd)
+            FROM opg_well_telemetry
+            WHERE well_id = %s AND timestamp BETWEEN %s AND %s + interval '2 hours';
+        """, (w_id, ev_ts, ev_ts))
+        post = cur.fetchone()
+
+    signals = [
+        ("Motor Current", "A", pre[0], post[0], 1),
+        ("Vibration (Vx)", "g", pre[1], post[1], 3),
+        ("Pump Intake Pressure (PIP)", "PSI", pre[2], post[2], 1),
+        ("Pump Discharge Pressure (PDP)", "PSI", pre[3], post[3], 1),
+        ("Motor Temperature", "°C", pre[4], post[4], 1),
+        ("Gross Liquid Rate", "BPD", pre[5], post[5], 1),
+    ]
+
+    comp_list = []
+    rows_md = []
+    for name, unit, prv, pov, prec in signals:
+        pv = round(float(prv), prec) if prv is not None else 0.0
+        po = round(float(pov), prec) if pov is not None else 0.0
+        delta = round(po - pv, prec)
+        comp_list.append({
+            "metric": name,
+            "unit": unit,
+            "pre_event_2h": pv,
+            "post_event": po,
+            "delta": delta,
+        })
+        fmt = f".{prec}f"
+        rows_md.append(
+            f"| **{name}** | `{pv:{fmt}} {unit}` | `{po:{fmt}} {unit}` | `{delta:+{fmt}} {unit}` |"
+        )
+
+    ev_ts_fmt = ev_ts.strftime('%Y-%m-%d %H:%M:%S') if hasattr(ev_ts, 'strftime') else str(ev_ts)
+    md = (
+        f"# [ESP APM] Event Telemetry Comparison: Before vs After Trip\n\n"
+        f"**Event ID**: `{ev_id}` | **Well ID**: `{w_id}` | **Trip Cause**: `{cause}` | **Trip Timestamp**: `{ev_ts_fmt}`\n\n"
+        f"| Operational Parameter | Pre-Event (2h Running Average) | Post-Event (2h Window) | Delta (Post - Pre) |\n"
+        f"|---|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        f"*(Empirical downhole telemetry anchored on trip event timestamp).*\n"
+    )
+
+    return EventBeforeAfterReport(
+        well_id=w_id,
+        event_id=ev_id,
+        event_timestamp=str(ev_ts),
+        trip_cause=cause,
+        metrics_comparison=comp_list,
+        markdown_report=md,
+    )
+
+
+def rank_fleet_by_metric(metric: str = "vibration", sort_order: str = "DESC") -> FleetRankingReport:
+    """Capability 2.6: Strictly objective fleet ranking and leaderboard across all 10 monitored assets.
+    Zero causal explanations or diagnostic speculation; displays values, state, and deviation vs median."""
+    metric_clean = metric.lower().strip()
+    
+    if any(k in metric_clean for k in ["temp", "heat", "thermal"]):
+        m_col = "t.motor_temperature_c"
+        m_name = "Motor Temperature"
+        unit = "°C"
+        prec = 1
+    elif any(k in metric_clean for k in ["oil", "bopd"]):
+        m_col = "COALESCE(t.flow_rate_bpd * (1 - t.water_cut_pct/100.0), 0)"
+        m_name = "Net Oil Rate"
+        unit = "BOPD"
+        prec = 1
+    elif any(k in metric_clean for k in ["prod", "flow", "liquid", "bpd"]):
+        m_col = "t.flow_rate_bpd"
+        m_name = "Gross Liquid Rate"
+        unit = "BPD"
+        prec = 1
+    elif any(k in metric_clean for k in ["water cut", "water_cut", "wc", "bsw"]):
+        m_col = "t.water_cut_pct"
+        m_name = "Water Cut"
+        unit = "%"
+        prec = 1
+    elif any(k in metric_clean for k in ["current", "amp", "load"]):
+        m_col = "t.motor_current_a"
+        m_name = "Motor Current"
+        unit = "A"
+        prec = 1
+    elif any(k in metric_clean for k in ["pip", "intake"]):
+        m_col = "t.intake_pressure_psi"
+        m_name = "Pump Intake Pressure"
+        unit = "PSI"
+        prec = 1
+    elif any(k in metric_clean for k in ["pdp", "discharge"]):
+        m_col = "t.discharge_pressure_psi"
+        m_name = "Pump Discharge Pressure"
+        unit = "PSI"
+        prec = 1
+    elif any(k in metric_clean for k in ["trip", "shutdown", "failure"]):
+        m_col = "trips"
+        m_name = "Lifetime Trips"
+        unit = "trips"
+        prec = 0
+    else:
+        m_col = "t.vibration_g"
+        m_name = "Vibration (Vx Peak)"
+        unit = "g"
+        prec = 3
+
+    with get_esp_cursor() as cur:
+        if m_col == "trips":
+            cur.execute("""
+                SELECT w.well_id, w.cluster, count(e.event_id) as metric_val
+                FROM asset_registry w
+                LEFT JOIN events e ON w.well_id = e.well_id AND e.trip_cause IS NOT NULL
+                GROUP BY w.well_id, w.cluster
+                ORDER BY metric_val DESC;
+            """)
+            rows = cur.fetchall()
+            cur.execute("""
+                WITH latest_telem AS (
+                    SELECT DISTINCT ON (well_id) well_id, operating_state
+                    FROM opg_well_telemetry
+                    ORDER BY well_id, timestamp DESC
+                )
+                SELECT well_id, operating_state FROM latest_telem;
+            """)
+            st_map = dict(cur.fetchall())
+            parsed_rows = []
+            for r in rows:
+                wid = str(r[0])
+                c = str(r[1])
+                val = float(r[2])
+                state = (st_map.get(wid) or "UNKNOWN").upper()
+                parsed_rows.append((wid, c, state, val))
+        else:
+            cur.execute(f"""
+                WITH latest_telem AS (
+                    SELECT DISTINCT ON (well_id)
+                        well_id, timestamp, operating_state, {m_col} as val
+                    FROM opg_well_telemetry t
+                    WHERE well_id IN (SELECT well_id FROM asset_registry)
+                    ORDER BY well_id, timestamp DESC
+                )
+                SELECT w.well_id, w.cluster, t.operating_state, t.val
+                FROM asset_registry w
+                LEFT JOIN latest_telem t ON w.well_id = t.well_id
+                ORDER BY t.val DESC;
+            """)
+            raw = cur.fetchall()
+            parsed_rows = [(str(r[0]), str(r[1]), (r[2] or "UNKNOWN").upper(), float(r[3]) if r[3] is not None else 0.0) for r in raw]
+
+    all_vals = [r[3] for r in parsed_rows]
+    med_val = float(statistics.median(all_vals)) if all_vals else 0.0
+
+    reverse_sort = (sort_order.upper() != "ASC")
+    sorted_rows = sorted(parsed_rows, key=lambda x: x[3], reverse=reverse_sort)
+
+    leaderboard = []
+    rows_md = []
+    for rank, (wid, cluster, state, val) in enumerate(sorted_rows, 1):
+        dev = round(((val - med_val) / med_val * 100.0), 1) if med_val != 0 else 0.0
+        leaderboard.append(
+            FleetRankItem(
+                rank=rank,
+                well_id=wid,
+                cluster=f"Cluster {cluster}",
+                metric_name=m_name,
+                metric_value=round(val, prec),
+                operating_state=state,
+                deviation_vs_median_pct=dev,
+            )
+        )
+        fmt = f".{prec}f"
+        val_str = f"**`{val:{fmt}} {unit}`**" if rank <= 3 else f"`{val:{fmt}} {unit}`"
+        rows_md.append(
+            f"| #{rank} | `{wid}` | Cluster {cluster} | {val_str} | `{state}` | `{dev:+.1f}%` |"
+        )
+
+    fmt_med = f".{prec}f"
+    md = (
+        f"# [ESP APM] Fleet Ranking: {m_name}\n\n"
+        f"**Fleet Median {m_name}**: `{med_val:{fmt_med}} {unit}` | **Source**: `opg_well_telemetry` on Server 184\n\n"
+        f"| Rank | Well ID | Cluster | {m_name} ({unit}) | Operating State | Deviation vs Median |\n"
+        f"|---|---|---|---|---|---|\n"
+        + "\n".join(rows_md) + "\n\n"
+        f"*(No speculative explanation text included, preserving pure comparative objectivity).*\n"
+    )
+
+    return FleetRankingReport(
+        ranking_metric=m_name,
+        sort_order=sort_order,
+        fleet_median=round(med_val, prec),
+        leaderboard=leaderboard,
+        markdown_report=md,
+    )
+
+
 def route_query_hybrid(
     question: str,
     conversation_history: list[dict[str, Any]] | None = None,
 ) -> HybridRouteResult:
-    """Multi-tier hybrid router: Tier 0 Multi-Well / Entity Regex -> Tier 0.E Antecedent & Conceptual -> Tier 1 Qwen LLM -> Tier Fallback."""
+    """Multi-tier hybrid router: Tier 0 Domain 2 Comparative / Entity Regex -> Tier 0.E Antecedent & Conceptual -> Tier 1 Qwen LLM -> Tier Fallback."""
     q_lower = question.lower().strip()
 
-    # 1. Multi-Well Comparative Extraction (Gap 1)
+    # 1. Extract Well IDs & Event ID
     all_wells = extract_all_well_ids(question)
-    is_comparative = any(term in q_lower for term in ["compare", "versus", " vs ", "difference between", "better than", "worse than", "which well", "which has higher"])
-    if len(all_wells) >= 2 or (len(all_wells) == 1 and is_comparative):
+    ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
+    event_id = ev_match.group(1) if ev_match else None
+
+    # TIER 0.COMPARE_EVENT: Before vs After Event Comparison (Capability 2.5)
+    before_after_words = [
+        "before and after", "before vs after", "pre vs post", "pre-trip vs post-trip",
+        "before the trip", "after the trip", "before trip and after trip", "pre vs post trip",
+        "prior to trip and after", "before event", "after event", "before/after"
+    ]
+    if any(ba in q_lower for ba in before_after_words) and (event_id or all_wells):
+        target_entity = event_id or all_wells[0]
+        return HybridRouteResult(
+            intent=ESPIntentEnum.EVENT_BEFORE_AFTER,
+            entity=target_entity,
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+
+    # TIER 0.COMPARE_CLUSTER: Gathering Cluster Comparison (Capability 2.2)
+    cl_matches = list(dict.fromkeys(re.findall(r"\b(?:cluster[-_\s]?|gcs[-_\s]?)(15|3|4)\b", question, re.IGNORECASE)))
+    is_cluster_comp = any(w in q_lower for w in ["compare", "vs", "versus", "difference", "between", "delta"])
+    if len(cl_matches) >= 2 and is_cluster_comp:
+        return HybridRouteResult(
+            intent=ESPIntentEnum.CLUSTER_COMPARE,
+            entity=f"Cluster {cl_matches[0]} vs Cluster {cl_matches[1]}",
+            entities=[f"Cluster {cl_matches[0]}", f"Cluster {cl_matches[1]}"],
+            confidence=0.99,
+            routing_tier="TIER_0_REGEX",
+        )
+    # Ambiguity check for open-ended cluster comparison
+    open_cluster_prompts = ["compare clusters", "compare the clusters", "cluster comparison", "compare gathering clusters", "compare gathering stations", "clusters comparison"]
+    if any(oc in q_lower for oc in open_cluster_prompts) or (is_cluster_comp and len(cl_matches) == 1 and not all_wells):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.CLUSTER_COMPARE,
+            entity=None,
+            confidence=0.70,
+            routing_tier="TIER_0_REGEX",
+            needs_clarification=True,
+            clarification_question="Which gathering clusters would you like to compare?",
+            suggested_options=["Cluster 15 vs Cluster 4", "Cluster 3 vs Cluster 4", "Cluster 15 vs Cluster 3"],
+        )
+
+    # TIER 0.COMPARE_MULTI_WELL: Multi-Well Comparative Analysis (Capability 2.1)
+    if len(all_wells) >= 2:
         return HybridRouteResult(
             intent=ESPIntentEnum.MULTI_WELL_COMPARE,
             entity=" vs ".join(all_wells),
@@ -2288,9 +2899,74 @@ def route_query_hybrid(
             routing_tier="TIER_0_MULTI_WELL",
         )
 
-    # 2. Extract Event ID
-    ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
-    event_id = ev_match.group(1) if ev_match else None
+    # TIER 0.COMPARE_SINGLE_WELL: Single Well Historical, Peer Benchmarking, or Ambiguity HITL
+    if len(all_wells) == 1:
+        single_well = all_wells[0]
+        # Historical Comparison (Capability 2.3)
+        hist_comp_words = [
+            "baseline", "historical", "last week", "prior", "yesterday", "past vs present",
+            "current vs baseline", "vs prior", "vs history", "vs last week", "historical comparison",
+            "compare with baseline", "operating baseline", "24h vs"
+        ]
+        if any(hw in q_lower for hw in hist_comp_words):
+            return HybridRouteResult(
+                intent=ESPIntentEnum.HISTORICAL_COMPARE,
+                entity=single_well,
+                confidence=0.98,
+                routing_tier="TIER_0_REGEX",
+            )
+
+        # Peer Benchmarking (Capability 2.4)
+        peer_words = ["peer", "peers", "benchmark", "against cluster", "vs cluster", "pad", "group", "vs peers", "against peers"]
+        if any(pw in q_lower for pw in peer_words):
+            return HybridRouteResult(
+                intent=ESPIntentEnum.PEER_BENCHMARK,
+                entity=single_well,
+                confidence=0.98,
+                routing_tier="TIER_0_REGEX",
+            )
+
+        # Ambiguous Single Well Comparison (HITL Clarification)
+        is_single_comp = any(term in q_lower for term in ["compare", "versus", " vs ", "benchmark"])
+        if is_single_comp and not any(w in q_lower for w in ["health", "status", "condition", "flow", "rate", "water cut", "trip", "diagnose"]):
+            return HybridRouteResult(
+                intent=ESPIntentEnum.MULTI_WELL_COMPARE,
+                entity=single_well,
+                confidence=0.60,
+                routing_tier="TIER_0_REGEX",
+                needs_clarification=True,
+                clarification_question=f"What would you like to compare well {single_well} against?",
+                suggested_options=[f"{single_well} vs FS-040 (Cluster Peer)", f"{single_well} vs Historical Baseline", f"Benchmark {single_well} against Cluster Peers"],
+            )
+
+    # TIER 0.FLEET_RANKING: Fleet Metric Ranking & Leaderboards (Capability 2.6)
+    rank_triggers = [
+        "rank wells", "rank the wells", "ranking", "leaderboard", "top producing", "top producers",
+        "highest vibration", "lowest vibration", "highest temp", "lowest temp", "most trips",
+        "highest water cut", "rank by", "rank fleet", "highest current", "rank assets", "top wells"
+    ]
+    if any(rt in q_lower for rt in rank_triggers) and not all_wells:
+        metric_name = "vibration"
+        if any(m in q_lower for m in ["temp", "thermal", "heat"]):
+            metric_name = "temperature"
+        elif any(m in q_lower for m in ["oil", "bopd"]):
+            metric_name = "oil"
+        elif any(m in q_lower for m in ["prod", "flow", "liquid", "bpd"]):
+            metric_name = "production"
+        elif any(m in q_lower for m in ["water cut", "water_cut", "wc", "bsw"]):
+            metric_name = "water_cut"
+        elif any(m in q_lower for m in ["trip", "trips", "failure", "failures"]):
+            metric_name = "trips"
+        elif any(m in q_lower for m in ["current", "amp", "load"]):
+            metric_name = "current"
+        
+        sort_dir = "ASC" if any(w in q_lower for w in ["lowest", "bottom", "least"]) else "DESC"
+        return HybridRouteResult(
+            intent=ESPIntentEnum.FLEET_RANKING,
+            entity=metric_name,
+            confidence=0.98,
+            routing_tier="TIER_0_REGEX",
+        )
 
     # TIER 0.A: Event ID Present -> Immediate Diagnosis
     if event_id:
