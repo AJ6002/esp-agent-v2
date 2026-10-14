@@ -2057,16 +2057,17 @@ def get_fleet_anomaly_surfacing() -> FleetAnomalyReport:
     on currently running assets before emergency shutdown relays trigger."""
     with get_esp_cursor() as cur:
         cur.execute("""
-            WITH latest_running AS (
+            WITH latest_telem AS (
                 SELECT DISTINCT ON (well_id)
-                    well_id, timestamp, vibration_g, motor_temperature_c, 
+                    well_id, timestamp, operating_state, vibration_g, motor_temperature_c, 
                     intake_pressure_psi, discharge_pressure_psi, motor_current_a
                 FROM opg_well_telemetry
-                WHERE operating_state = 'running' AND well_id IN (SELECT well_id FROM asset_registry)
+                WHERE well_id IN (SELECT well_id FROM asset_registry)
                 ORDER BY well_id, timestamp DESC
             )
             SELECT well_id, vibration_g, motor_temperature_c, intake_pressure_psi, discharge_pressure_psi, motor_current_a
-            FROM latest_running;
+            FROM latest_telem
+            WHERE operating_state = 'running';
         """)
         rows = cur.fetchall()
 
@@ -2507,7 +2508,7 @@ def route_query_hybrid(
         )
 
     # TIER 0.G: Ambiguous Active Trip Missing Entity (Trigger HITL Clarification)
-    if any(w in q_lower for w in ["trip", "shutdown", "shutdwn", "why did it stop", "diagnose the well", "check the pump", "is the well healthy"]) and not norm_well:
+    if any(w in q_lower for w in ["trip", "shutdown", "shutdwn", "why did it stop", "why did the pump stop", "why did pump stop", "pump stop", "pump stopped", "stopped", "diagnose the well", "check the pump", "is the well healthy"]) and not norm_well:
         return HybridRouteResult(
             intent=ESPIntentEnum.EVENT_DIAGNOSE,
             entity=None,
