@@ -224,6 +224,28 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "disclose known constraints and sensor gaps",
         "what are you not able to do",
     ],
+    ESPIntentEnum.EVENT_BEFORE_AFTER: [
+        "compare telemetry before and after the trip",
+        "pre-trip vs post-trip parameter comparison",
+        "contrast baseline before event vs after shutdown",
+        "before and after the trip event telemetry",
+        "pre vs post trip pressure and vibration delta",
+        "prior to trip and after trip comparison",
+    ],
+    ESPIntentEnum.SELF_TASKS: [
+        "what tasks can you handle or execute",
+        "list supported procedures and workflows",
+        "what standard operating procedures can you assist with",
+        "supported tasks and operational workflows list",
+        "what analytical tasks can you perform",
+    ],
+    ESPIntentEnum.CHAT: [
+        "hello how are you doing today",
+        "good morning assistant",
+        "hi there copilot",
+        "good evening how are things",
+        "hey what's up",
+    ],
     ESPIntentEnum.KNOWLEDGE: [
         "what causes gas locking in an electric submersible pump",
         "api rp 11s standards for esp cable installation",

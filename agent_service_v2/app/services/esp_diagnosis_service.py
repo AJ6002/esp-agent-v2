@@ -26,6 +26,8 @@ from app.schemas.esp_diagnosis import (
     DiagnoseEventRequest,
     ESPDiagnosisResponse,
     ESPIntentEnum,
+    RoutingTierEnum,
+    canonicalize_intent,
     EventBeforeAfterReport,
     FleetAlarmTimelineReport,
     FleetAnomalyReport,
@@ -3891,7 +3893,7 @@ def route_query_hybrid(
                     intent=ESPIntentEnum.UI_NAVIGATION,
                     entity=target_entity,
                     confidence=0.75,
-                    routing_tier="TIER_0_UI_NAVIGATION",
+                    routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
                     needs_clarification=True,
                     clarification_question="Multiple platform screens match your query. Which view would you like to explore?",
                     suggested_options=candidates,
@@ -3900,7 +3902,7 @@ def route_query_hybrid(
                 intent=ESPIntentEnum.UI_NAVIGATION,
                 entity=target_entity,
                 confidence=0.99,
-                routing_tier="TIER_0_UI_NAVIGATION",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
 
     # TIER 0.COMPARE_EVENT: Before vs After Event Comparison (Capability 2.5)
@@ -3915,7 +3917,7 @@ def route_query_hybrid(
             intent=ESPIntentEnum.EVENT_BEFORE_AFTER,
             entity=target_entity,
             confidence=0.99,
-            routing_tier="TIER_0_REGEX",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
     # TIER 0.COMPARE_CLUSTER: Gathering Cluster Comparison (Capability 2.2)
@@ -3927,7 +3929,7 @@ def route_query_hybrid(
             entity=f"Cluster {cl_matches[0]} vs Cluster {cl_matches[1]}",
             entities=[f"Cluster {cl_matches[0]}", f"Cluster {cl_matches[1]}"],
             confidence=0.99,
-            routing_tier="TIER_0_REGEX",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
     # Ambiguity check for open-ended cluster comparison
     open_cluster_prompts = ["compare clusters", "compare the clusters", "cluster comparison", "compare gathering clusters", "compare gathering stations", "clusters comparison"]
@@ -3936,7 +3938,7 @@ def route_query_hybrid(
             intent=ESPIntentEnum.CLUSTER_COMPARE,
             entity=None,
             confidence=0.70,
-            routing_tier="TIER_0_REGEX",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             needs_clarification=True,
             clarification_question="Which gathering clusters would you like to compare?",
             suggested_options=["Cluster 15 vs Cluster 4", "Cluster 3 vs Cluster 4", "Cluster 15 vs Cluster 3"],
@@ -3949,7 +3951,7 @@ def route_query_hybrid(
             entity=" vs ".join(all_wells),
             entities=all_wells,
             confidence=0.98,
-            routing_tier="TIER_0_MULTI_WELL",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
     # TIER 0.COMPARE_SINGLE_WELL: Single Well Historical, Peer Benchmarking, or Ambiguity HITL
@@ -4187,7 +4189,7 @@ def route_query_hybrid(
             intent=ESPIntentEnum.WORK_ORDER_DISPATCH,
             entity=target_entity,
             confidence=0.99,
-            routing_tier="TIER_0_DISPATCH",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
     if norm_well:
@@ -4201,7 +4203,7 @@ def route_query_hybrid(
                 entity=norm_well,
                 time_filter_label=t_label,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         # 2. Active Trip / Shutdown Event Diagnosis
         if any(w in q_lower for w in ["trip", "diagnos", "shutdown", "shutdwn", "what happened", "why did it stop", "why did it shut", "why did it trip", "failure event", "fault event"]):
@@ -4209,7 +4211,7 @@ def route_query_hybrid(
                 intent=ESPIntentEnum.EVENT_DIAGNOSE,
                 entity=event_id or norm_well,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         # 3. Production Telemetry
         is_prod_query = any(w in q_lower for w in ["product", "flow", "bpd", "water cut", "bbl", "output"]) or bool(re.search(r"\brate\b", q_lower))
@@ -4218,7 +4220,7 @@ def route_query_hybrid(
                 intent=ESPIntentEnum.PRODUCTION,
                 entity=norm_well,
                 confidence=0.95,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         # 4. Live Health & Condition Surveillance
         if any(w in q_lower for w in ["health", "status", "condition", "vibrat", "current", "overload", "underload", "shak", "state", "temp"]):
@@ -4226,13 +4228,13 @@ def route_query_hybrid(
                 intent=ESPIntentEnum.WELL_HEALTH,
                 entity=norm_well,
                 confidence=0.95,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         return HybridRouteResult(
             intent=ESPIntentEnum.WELL_HEALTH,
             entity=norm_well,
             confidence=0.85,
-            routing_tier="TIER_0_REGEX",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
     # TIER 0.F: Conceptual vs. Active Trip Intent Disambiguation (Gap 5)
@@ -4247,7 +4249,7 @@ def route_query_hybrid(
             intent=ESPIntentEnum.KNOWLEDGE,
             entity=question,
             confidence=0.92,
-            routing_tier="TIER_0_CONCEPTUAL_RAG",
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
     # TIER 0.G: Ambiguous Active Trip Missing Entity (Trigger HITL Clarification)
@@ -4281,7 +4283,7 @@ def route_query_hybrid(
                     intent=sem_match.intent,
                     entity=None,
                     confidence=sem_match.confidence,
-                    routing_tier="TIER_0_5_SEMANTIC",
+                    routing_tier=RoutingTierEnum.TIER_0_5_SEMANTIC.value,
                     needs_clarification=True,
                     clarification_question=f"Which well would you like to inspect for {sem_match.intent.value.replace('_', ' ').lower()}?",
                     suggested_options=["FNW-001", "FS-017", "FS-004", "FS-006"],
@@ -4292,7 +4294,7 @@ def route_query_hybrid(
                 entities=all_wells,
                 time_filter_label=parsed_time_label,
                 confidence=sem_match.confidence,
-                routing_tier="TIER_0_5_SEMANTIC",
+                routing_tier=RoutingTierEnum.TIER_0_5_SEMANTIC.value,
             )
     except Exception as e:
         logger.warning(f"Tier 0.5 Semantic Router pass failed: {e}")
@@ -4305,15 +4307,13 @@ def route_query_hybrid(
                     "role": "system",
                     "content": (
                         "You are an intent router for an ESP artificial lift system. "
-                        "Classify the user query into ONE of these intents: "
-                        "KNOWLEDGE (petroleum engineering manuals, gas lock, bearing wear, electrical, standards), "
-                        "FLEET_INVENTORY (wells count, clusters), "
-                        "FLEET_PRODUCTION (total fleet production, bpd, deferment), "
-                        "SELF_CAPABILITIES (capabilities, features list), "
-                        "SELF_LIMITATIONS (limitations, constraints), "
-                        "CHAT (clear greetings like hi, hello, how are you), "
-                        "AMBIGUOUS (unclear, ambiguous, or unclassified requests). "
-                        "Return ONLY valid JSON: {\"intent\": \"<INTENT_NAME>\", \"topic\": \"extracted topic\"}"
+                        "Classify the user query into EXACTLY ONE canonical intent from this list:\n"
+                        "- Diagnostics & Surveillance: EVENT_DIAGNOSE, WELL_HISTORY, WELL_HEALTH, PRODUCTION, WORK_ORDER_DISPATCH\n"
+                        "- Fleet Operations: FLEET_INVENTORY, FLEET_PRODUCTION, FLEET_TRIAGE, FLEET_EXECUTIVE, FLEET_ANOMALY, FLEET_TIMELINE, FLEET_RANKING\n"
+                        "- Comparisons: MULTI_WELL_COMPARE, CLUSTER_COMPARE, HISTORICAL_COMPARE, PEER_BENCHMARK, EVENT_BEFORE_AFTER\n"
+                        "- Self & Platform: SELF_IDENTITY, SELF_CAPABILITIES, SELF_BOUNDARIES, SELF_FLEET_SCOPE, SELF_TASKS, SELF_LIMITATIONS, UI_NAVIGATION\n"
+                        "- General: KNOWLEDGE (engineering manuals, standards, physics), CHAT (greetings), AMBIGUOUS\n"
+                        "Return ONLY valid JSON: {\"intent\": \"<CANONICAL_INTENT>\", \"topic\": \"extracted topic\"}"
                     ),
                 },
                 {"role": "user", "content": question},
@@ -4322,16 +4322,15 @@ def route_query_hybrid(
             if resp.get("content"):
                 data = llm_client.parse_json(resp["content"])
                 if data:
-                    intent_val = data.get("intent") or data.get("classification")
-                    if intent_val:
-                        intent_str = str(intent_val).upper()
-                        if intent_str != "AMBIGUOUS" and intent_str in ESPIntentEnum.__members__:
-                            return HybridRouteResult(
-                                intent=ESPIntentEnum(intent_str),
-                                entity=data.get("topic") or question,
-                                confidence=0.85,
-                                routing_tier="TIER_1_LLM",
-                            )
+                    raw_intent = data.get("intent") or data.get("classification")
+                    resolved_intent = canonicalize_intent(str(raw_intent)) if raw_intent else None
+                    if resolved_intent and resolved_intent != ESPIntentEnum.CHAT:
+                        return HybridRouteResult(
+                            intent=resolved_intent,
+                            entity=data.get("topic") or question,
+                            confidence=0.85,
+                            routing_tier=RoutingTierEnum.TIER_1_LLM.value,
+                        )
         except Exception as e:
             logger.warning(f"Tier 1 LLM classification failed: {e}")
 
@@ -4341,7 +4340,7 @@ def route_query_hybrid(
         intent=ESPIntentEnum.CHAT,
         entity=None,
         confidence=0.50,
-        routing_tier="TIER_2_HITL_FALLBACK",
+        routing_tier=RoutingTierEnum.TIER_2_HITL_FALLBACK.value,
         needs_clarification=True,
         clarification_question="I could not determine the exact operational or engineering intent of your query. Could you please clarify your request, or select an operational action below?",
         suggested_options=[

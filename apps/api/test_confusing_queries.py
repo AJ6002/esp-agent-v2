@@ -129,7 +129,7 @@ def run_confusing_queries_benchmark():
 
         actual = route_res.intent.value
         tier = route_res.routing_tier
-        is_pass = (actual == expected) and (tier in ["TIER_0_5_SEMANTIC", "TIER_0_REGEX", "TIER_0_DISPATCH", "TIER_0_UI_NAVIGATION"])
+        is_pass = (actual == expected) and (tier in ["TIER_0_5_SEMANTIC", "TIER_0_REGEX"])
 
         if is_pass:
             passed_count += 1

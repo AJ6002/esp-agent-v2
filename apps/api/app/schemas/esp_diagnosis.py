@@ -117,13 +117,185 @@ class ESPIntentEnum(str, Enum):
     CHAT = "CHAT"
 
 
+class RoutingTierEnum(str, Enum):
+    TIER_0_REGEX = "TIER_0_REGEX"
+    TIER_0_5_SEMANTIC = "TIER_0_5_SEMANTIC"
+    TIER_1_LLM = "TIER_1_LLM"
+    TIER_2_HITL_FALLBACK = "TIER_2_HITL_FALLBACK"
+
+
+INTENT_ALIASES: dict[str, ESPIntentEnum] = {
+    # Event Diagnosis
+    "EVENT_DIAGNOSE": ESPIntentEnum.EVENT_DIAGNOSE,
+    "EVENT_DIAGNOSIS": ESPIntentEnum.EVENT_DIAGNOSE,
+    "DIAGNOSE": ESPIntentEnum.EVENT_DIAGNOSE,
+    "DIAGNOSIS": ESPIntentEnum.EVENT_DIAGNOSE,
+    "TRIP_DIAGNOSIS": ESPIntentEnum.EVENT_DIAGNOSE,
+    "TRIP_DIAGNOSE": ESPIntentEnum.EVENT_DIAGNOSE,
+    "ROOT_CAUSE": ESPIntentEnum.EVENT_DIAGNOSE,
+
+    # Well History
+    "WELL_HISTORY": ESPIntentEnum.WELL_HISTORY,
+    "HISTORY": ESPIntentEnum.WELL_HISTORY,
+    "HISTORICAL_ANALYSIS": ESPIntentEnum.WELL_HISTORY,
+    "FAILURE_HISTORY": ESPIntentEnum.WELL_HISTORY,
+    "TRIP_HISTORY": ESPIntentEnum.WELL_HISTORY,
+
+    # Well Health
+    "WELL_HEALTH": ESPIntentEnum.WELL_HEALTH,
+    "HEALTH": ESPIntentEnum.WELL_HEALTH,
+    "CONDITION_MONITORING": ESPIntentEnum.WELL_HEALTH,
+    "WELL_STATUS": ESPIntentEnum.WELL_HEALTH,
+
+    # Multi-Well Compare
+    "MULTI_WELL_COMPARE": ESPIntentEnum.MULTI_WELL_COMPARE,
+    "WELL_COMPARE": ESPIntentEnum.MULTI_WELL_COMPARE,
+    "COMPARE_WELLS": ESPIntentEnum.MULTI_WELL_COMPARE,
+    "COMPARE": ESPIntentEnum.MULTI_WELL_COMPARE,
+
+    # Fleet Inventory
+    "FLEET_INVENTORY": ESPIntentEnum.FLEET_INVENTORY,
+    "FLEET_STATUS": ESPIntentEnum.FLEET_INVENTORY,
+    "FLEET": ESPIntentEnum.FLEET_INVENTORY,
+    "INVENTORY": ESPIntentEnum.FLEET_INVENTORY,
+    "WELLS_LIST": ESPIntentEnum.FLEET_INVENTORY,
+
+    # Fleet Production
+    "FLEET_PRODUCTION": ESPIntentEnum.FLEET_PRODUCTION,
+    "TOTAL_PRODUCTION": ESPIntentEnum.FLEET_PRODUCTION,
+    "PRODUCTION_SUMMARY": ESPIntentEnum.FLEET_PRODUCTION,
+    "DEFERMENT": ESPIntentEnum.FLEET_PRODUCTION,
+
+    # Fleet Triage
+    "FLEET_TRIAGE": ESPIntentEnum.FLEET_TRIAGE,
+    "TRIAGE": ESPIntentEnum.FLEET_TRIAGE,
+    "PRIORITY_RANKING": ESPIntentEnum.FLEET_TRIAGE,
+    "WORKOVER_QUEUE": ESPIntentEnum.FLEET_TRIAGE,
+
+    # Fleet Executive
+    "FLEET_EXECUTIVE": ESPIntentEnum.FLEET_EXECUTIVE,
+    "EXECUTIVE": ESPIntentEnum.FLEET_EXECUTIVE,
+    "EXECUTIVE_SUMMARY": ESPIntentEnum.FLEET_EXECUTIVE,
+    "MANAGEMENT_BRIEFING": ESPIntentEnum.FLEET_EXECUTIVE,
+    "KPI_SUMMARY": ESPIntentEnum.FLEET_EXECUTIVE,
+
+    # Fleet Anomaly
+    "FLEET_ANOMALY": ESPIntentEnum.FLEET_ANOMALY,
+    "ANOMALY": ESPIntentEnum.FLEET_ANOMALY,
+    "ANOMALY_DETECTION": ESPIntentEnum.FLEET_ANOMALY,
+    "EARLY_WARNING": ESPIntentEnum.FLEET_ANOMALY,
+
+    # Fleet Timeline
+    "FLEET_TIMELINE": ESPIntentEnum.FLEET_TIMELINE,
+    "TIMELINE": ESPIntentEnum.FLEET_TIMELINE,
+    "ALARM_TIMELINE": ESPIntentEnum.FLEET_TIMELINE,
+    "INCIDENT_TIMELINE": ESPIntentEnum.FLEET_TIMELINE,
+
+    # Cluster Compare
+    "CLUSTER_COMPARE": ESPIntentEnum.CLUSTER_COMPARE,
+    "COMPARE_CLUSTERS": ESPIntentEnum.CLUSTER_COMPARE,
+    "GCS_COMPARE": ESPIntentEnum.CLUSTER_COMPARE,
+
+    # Historical Compare
+    "HISTORICAL_COMPARE": ESPIntentEnum.HISTORICAL_COMPARE,
+    "BASELINE_COMPARE": ESPIntentEnum.HISTORICAL_COMPARE,
+    "BASELINE_AUDIT": ESPIntentEnum.HISTORICAL_COMPARE,
+    "DESIGN_ENVELOPE": ESPIntentEnum.HISTORICAL_COMPARE,
+
+    # Peer Benchmark
+    "PEER_BENCHMARK": ESPIntentEnum.PEER_BENCHMARK,
+    "BENCHMARK": ESPIntentEnum.PEER_BENCHMARK,
+    "PEER_COMPARISON": ESPIntentEnum.PEER_BENCHMARK,
+
+    # Event Before After
+    "EVENT_BEFORE_AFTER": ESPIntentEnum.EVENT_BEFORE_AFTER,
+    "BEFORE_AFTER": ESPIntentEnum.EVENT_BEFORE_AFTER,
+    "PRE_POST_TRIP": ESPIntentEnum.EVENT_BEFORE_AFTER,
+
+    # Fleet Ranking
+    "FLEET_RANKING": ESPIntentEnum.FLEET_RANKING,
+    "RANKING": ESPIntentEnum.FLEET_RANKING,
+    "LEADERBOARD": ESPIntentEnum.FLEET_RANKING,
+    "RANK_WELLS": ESPIntentEnum.FLEET_RANKING,
+
+    # Self Identity
+    "SELF_IDENTITY": ESPIntentEnum.SELF_IDENTITY,
+    "IDENTITY": ESPIntentEnum.SELF_IDENTITY,
+    "WHO_ARE_YOU": ESPIntentEnum.SELF_IDENTITY,
+
+    # Self Capabilities
+    "SELF_CAPABILITIES": ESPIntentEnum.SELF_CAPABILITIES,
+    "CAPABILITIES": ESPIntentEnum.SELF_CAPABILITIES,
+    "FEATURES": ESPIntentEnum.SELF_CAPABILITIES,
+
+    # Self Boundaries
+    "SELF_BOUNDARIES": ESPIntentEnum.SELF_BOUNDARIES,
+    "BOUNDARIES": ESPIntentEnum.SELF_BOUNDARIES,
+    "SAFETY_REFUSAL": ESPIntentEnum.SELF_BOUNDARIES,
+    "ACTUATION_REFUSAL": ESPIntentEnum.SELF_BOUNDARIES,
+
+    # Self Fleet Scope
+    "SELF_FLEET_SCOPE": ESPIntentEnum.SELF_FLEET_SCOPE,
+    "FLEET_SCOPE": ESPIntentEnum.SELF_FLEET_SCOPE,
+    "SCOPE": ESPIntentEnum.SELF_FLEET_SCOPE,
+
+    # Self Tasks
+    "SELF_TASKS": ESPIntentEnum.SELF_TASKS,
+    "TASKS": ESPIntentEnum.SELF_TASKS,
+    "WORKFLOWS": ESPIntentEnum.SELF_TASKS,
+
+    # Self Limitations
+    "SELF_LIMITATIONS": ESPIntentEnum.SELF_LIMITATIONS,
+    "LIMITATIONS": ESPIntentEnum.SELF_LIMITATIONS,
+    "CONSTRAINTS": ESPIntentEnum.SELF_LIMITATIONS,
+
+    # UI Navigation
+    "UI_NAVIGATION": ESPIntentEnum.UI_NAVIGATION,
+    "NAVIGATION": ESPIntentEnum.UI_NAVIGATION,
+    "UI_ROUTE": ESPIntentEnum.UI_NAVIGATION,
+    "SCREEN_NAVIGATION": ESPIntentEnum.UI_NAVIGATION,
+
+    # Production
+    "PRODUCTION": ESPIntentEnum.PRODUCTION,
+    "WELL_PRODUCTION": ESPIntentEnum.PRODUCTION,
+    "FLOW_RATE": ESPIntentEnum.PRODUCTION,
+
+    # Knowledge
+    "KNOWLEDGE": ESPIntentEnum.KNOWLEDGE,
+    "RAG": ESPIntentEnum.KNOWLEDGE,
+    "STANDARDS": ESPIntentEnum.KNOWLEDGE,
+    "ENGINEERING_KNOWLEDGE": ESPIntentEnum.KNOWLEDGE,
+
+    # Work Order Dispatch
+    "WORK_ORDER_DISPATCH": ESPIntentEnum.WORK_ORDER_DISPATCH,
+    "WORK_ORDER": ESPIntentEnum.WORK_ORDER_DISPATCH,
+    "DISPATCH": ESPIntentEnum.WORK_ORDER_DISPATCH,
+    "LOTO": ESPIntentEnum.WORK_ORDER_DISPATCH,
+
+    # Chat
+    "CHAT": ESPIntentEnum.CHAT,
+    "GREETING": ESPIntentEnum.CHAT,
+    "CHITCHAT": ESPIntentEnum.CHAT,
+}
+
+
+def canonicalize_intent(raw_intent: str | None) -> ESPIntentEnum | None:
+    """Deterministically map any raw intent string or alias to canonical ESPIntentEnum."""
+    if not raw_intent:
+        return None
+    cleaned = raw_intent.strip().upper().replace(" ", "_").replace("-", "_")
+    if cleaned in ESPIntentEnum.__members__:
+        return ESPIntentEnum(cleaned)
+    return INTENT_ALIASES.get(cleaned)
+
+
 class HybridRouteResult(BaseModel):
     intent: ESPIntentEnum
     entity: str | None = None
     entities: list[str] = Field(default_factory=list, description="Multiple entities for comparison queries")
     time_filter_label: str | None = None
     confidence: float = Field(ge=0.0, le=1.0, default=1.0)
-    routing_tier: str = "TIER_0_REGEX"
+    routing_tier: str = RoutingTierEnum.TIER_0_REGEX.value
     needs_clarification: bool = False
     clarification_question: str | None = None
     suggested_options: list[str] = []
