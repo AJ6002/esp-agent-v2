@@ -4402,6 +4402,7 @@ def route_query_hybrid(
         "weather in", "forecast for", "recipe for", "how to bake", "how to cook",
         "capital of", "who is the president of", "who was the first president",
         "write javascript", "write html", "write react code", "python web scraper", "code a website",
+        "python script", "scrape", "scraper", "web scrape", "write code", "code a scraper",
         "recommend a movie", "movie recommendation", "what should i watch", "meaning of life",
         "what is the capital of"
     ]
@@ -4706,7 +4707,7 @@ def route_query_hybrid(
             )
 
         # Peer Benchmarking (Capability 2.4)
-        peer_words = ["peer", "peers", "benchmark", "against cluster", "vs cluster", "pad", "group", "vs peers", "against peers"]
+        peer_words = ["peer", "peers", "benchmark", "against cluster", "vs cluster", "pad", "group", "vs peers", "against peers", "neighbor", "neighbors", "stack up", "stack up against"]
         if any(pw in q_lower for pw in peer_words):
             return HybridRouteResult(
                 intent=ESPIntentEnum.PEER_BENCHMARK,
@@ -4730,11 +4731,13 @@ def route_query_hybrid(
 
     # TIER 0.FLEET_RANKING: Fleet Metric Ranking & Leaderboards (Capability 2.6)
     rank_triggers = [
-        "rank wells", "rank the wells", "ranking", "leaderboard", "top producing", "top producers",
+        "rank", "rank wells", "rank the wells", "rank all wells", "rank all wells by",
+        "ranking", "leaderboard", "top producing", "top producers",
         "highest vibration", "lowest vibration", "highest temp", "lowest temp", "most trips",
         "highest water cut", "rank by", "rank fleet", "highest current", "rank assets", "top wells"
     ]
-    if any(rt in q_lower for rt in rank_triggers) and not all_wells:
+    is_triage_query = any(tw in q_lower for tw in ["offline", "triage", "intervention", "priority", "fix first", "highest risk"])
+    if any(rt in q_lower for rt in rank_triggers) and not all_wells and not is_triage_query:
         metric_name = "vibration"
         if any(m in q_lower for m in ["temp", "thermal", "heat"]):
             metric_name = "temperature"
