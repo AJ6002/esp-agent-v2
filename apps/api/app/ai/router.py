@@ -48,6 +48,7 @@ from app.services.esp_diagnosis_service import (
     get_data_readiness_refusal_report,
     get_unknown_asset_refusal_report,
     get_out_of_scope_refusal_report,
+    get_well_recent_events,
     VALID_FLEET_WELLS,
 )
 
@@ -278,6 +279,53 @@ def ask_agent(
                     "suggested_options": dr_res["suggested_options"],
                 })
 
+        # Domain 3: Multi-Event Disambiguation (if multiple historical events exist and no specific event specified)
+        if target_well and not ev_id:
+            is_explicit_latest = any(w in question.lower() for w in ["latest", "most recent", "last trip", "current trip", "newest", "diagnose latest"])
+            recent_events = get_well_recent_events(target_well, limit=5)
+            if len(recent_events) > 1 and not is_explicit_latest:
+                options = []
+                for idx, ev in enumerate(recent_events[:3]):
+                    ts_label = ev["timestamp"].strftime("%Y-%m-%d %H:%M UTC") if hasattr(ev["timestamp"], "strftime") else str(ev["timestamp"])
+                    prefix = "(Recommended) " if idx == 0 else ""
+                    options.append(f"{prefix}Diagnose {ev['event_id']} ({ts_label} - {ev['trip_cause']})")
+                options.append(f"Show Reliability History for {target_well}")
+
+                clarification_md = (
+                    f"### [ESP APM] Multiple Trip Incidents Detected: `{target_well}`\n\n"
+                    f"Well `{target_well}` has **{len(recent_events)}** recorded trip incidents in the operational event store. "
+                    f"Please select which incident you would like to analyze:\n\n"
+                    + "\n".join([f"- **{opt}**" for opt in options])
+                    + f"\n\n*Tip: Click an option chip below or type `latest` to diagnose the most recent event.*"
+                )
+                session_manager.record_execution(
+                    session_id=session.session_id,
+                    intent="EVENT_DIAGNOSE",
+                    entity=target_well,
+                    markdown_report=clarification_md,
+                    page_route=page_route or session.active_page_route,
+                )
+                return finalize_response({
+                    "intent": "EVENT_DIAGNOSE",
+                    "markdown_text": clarification_md,
+                    "structured_data": {
+                        "well_id": target_well,
+                        "available_events": [
+                            {
+                                "event_id": e["event_id"],
+                                "timestamp": e["timestamp"].isoformat() if hasattr(e["timestamp"], "isoformat") else str(e["timestamp"]),
+                                "trip_cause": e["trip_cause"],
+                                "severity": e["severity"],
+                            }
+                            for e in recent_events
+                        ],
+                        "needs_clarification": True,
+                    },
+                    "confidence": 0.85,
+                    "needs_clarification": True,
+                    "suggested_options": options,
+                })
+
         diag_res = diagnose_esp_event(DiagnoseEventRequest(event_id=ev_id, well_id=target_well))
 
         # Record execution snapshot in session
@@ -292,13 +340,20 @@ def ask_agent(
             page_route=page_route or session.active_page_route,
         )
 
+        effective_event_id = ev_id or diag_res.event_id
         return finalize_response({
             "intent": "EVENT_DIAGNOSE",
             "markdown_text": diag_res.markdown_report,
             "structured_data": diag_res.structured_data,
             "confidence": float(diag_res.mathematical_confidence_pct) / 100.0,
             "needs_clarification": False,
-            "suggested_options": [f"Well {target_well} Health", f"Well {target_well} History", "What data did you use?", "Why was it diagnosed?"],
+            "suggested_options": [
+                f"Open Forensics Workspace (/events/{effective_event_id})",
+                f"Dispatch Work Order for {target_well}",
+                f"Well {target_well} Equalizer",
+                "What data did you use?",
+                "Why was it diagnosed?",
+            ],
         })
 
     # 4. Fleet Inventory & Real-Time Status

@@ -251,14 +251,42 @@ def resolve_event(
     }
 
 
+def get_well_recent_events(
+    well_id: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    """Query recent trip events recorded for a well from PostgreSQL events table."""
+    norm_id = normalize_well_id(well_id) or well_id
+    with get_esp_cursor() as cur:
+        cur.execute("""
+            SELECT event_id, timestamp, trip_cause, severity, scenario
+            FROM events
+            WHERE well_id = %s
+            ORDER BY timestamp DESC
+            LIMIT %s;
+        """, (norm_id, limit))
+        rows = cur.fetchall()
+        results = []
+        for r in rows:
+            results.append({
+                "event_id": str(r[0]),
+                "timestamp": r[1],
+                "trip_cause": str(r[2]) if r[2] else "UNKNOWN",
+                "severity": str(r[3]) if r[3] else "HIGH",
+                "scenario": str(r[4]) if r[4] else "",
+            })
+        return results
+
+
 def get_telemetry_window(
     well_id: str,
     event_ts: datetime,
-    window_sec: int = 120,
+    window_sec: int = 900,
+    post_window_sec: int = 300,
 ) -> list[dict[str, Any]]:
-    """Extract telemetry from opg_well_telemetry around the event window."""
+    """Extract telemetry from opg_well_telemetry around the event window (default 15-min pre / 5-min post)."""
     t_start = event_ts - timedelta(seconds=window_sec)
-    t_end = event_ts + timedelta(seconds=30)
+    t_end = event_ts + timedelta(seconds=post_window_sec)
 
     with get_esp_cursor() as cur:
         cur.execute("""
@@ -803,14 +831,25 @@ def synthesize_xai_report(
         f"### 5. RANKED HYPOTHESES\n{hypotheses_text}\n\n"
         f"### 6. IMPACT\n{impact_text}\n\n"
         f"### 7. NEXT STEPS\n{steps_text}\n\n"
+        f"> 🔍 **Deep Forensics Drilldown**: Open the full 7-pillar telemetry workspace for this trip: **[/events/{event_id}](/events/{event_id})**\n\n"
         f"---\n"
         f"> **Engineering Disclaimer**: *AI diagnostic outputs are decision-support recommendations. Maintenance technicians and certified production engineers must perform physical Lockout/Tagout and verify wellhead conditions prior to equipment intervention.*"
     )
+
+    event_ts = event_data["timestamp"]
+    t_trip_iso = event_ts.isoformat() if hasattr(event_ts, "isoformat") else str(event_ts)
+    t_pre_iso = (event_ts - timedelta(minutes=15)).isoformat() if hasattr(event_ts, "isoformat") else str(event_ts)
+    t_post_iso = (event_ts + timedelta(minutes=5)).isoformat() if hasattr(event_ts, "isoformat") else str(event_ts)
 
     structured_data = {
         "event_id": event_id,
         "well_id": well_id,
         "timestamp": ts_str,
+        "trip_timestamp": t_trip_iso,
+        "pre_trip_window_start": t_pre_iso,
+        "post_trip_window_end": t_post_iso,
+        "resolved_path": f"/events/{event_id}",
+        "route_title": f"Event Investigation Workspace ({event_id})",
         "trip_cause": trip_cause,
         "severity": severity,
         "confidence_pct": confidence_pct,
@@ -912,8 +951,8 @@ def diagnose_esp_event(req: DiagnoseEventRequest) -> ESPDiagnosisResponse:
     # 2. Extract baseline
     asset = get_asset_baseline(well_id)
 
-    # 3. Extract telemetry window
-    telemetry = get_telemetry_window(well_id, event_ts, window_sec=120)
+    # 3. Extract telemetry window (15-min pre-trip / 5-min post-trip)
+    telemetry = get_telemetry_window(well_id, event_ts, window_sec=900, post_window_sec=300)
 
     # 4. Mathematical truth calculations
     physics = calculate_physics_and_deviations(telemetry, asset, event_ts)
