@@ -275,6 +275,36 @@ def test_rest_ask_endpoints():
     print("PASSED: POST /api/v1/esp/ask returned valid JSON response.")
 
 
+def test_tier_0_5_semantic_routing():
+    print("\n--- [TEST 16] Tier 0.5 Semantic Vector Routing ---")
+    from app.services.esp_diagnosis_service import route_query_hybrid
+    from app.schemas.esp_diagnosis import ESPIntentEnum
+
+    # 1. Semantic paraphrasing of fleet production (no 'fleet' keyword)
+    r1 = route_query_hybrid("what is our daily extraction volume in barrels")
+    print(f"Query 1: {r1.intent.value} via {r1.routing_tier} (confidence={r1.confidence})")
+    assert r1.intent == ESPIntentEnum.FLEET_PRODUCTION
+    assert r1.routing_tier == "TIER_0_5_SEMANTIC"
+
+    # 2. Semantic paraphrasing of fleet triage
+    r2 = route_query_hybrid("which downed pumps are highest priority to service")
+    print(f"Query 2: {r2.intent.value} via {r2.routing_tier} (confidence={r2.confidence})")
+    assert r2.intent == ESPIntentEnum.FLEET_TRIAGE
+    assert r2.routing_tier == "TIER_0_5_SEMANTIC"
+
+    # 3. Semantic paraphrasing of actuation refusal (bypasses regex keywords)
+    r3 = route_query_hybrid("command the variable speed drive remotely")
+    print(f"Query 3: {r3.intent.value} via {r3.routing_tier} (confidence={r3.confidence})")
+    assert r3.intent == ESPIntentEnum.SELF_BOUNDARIES
+    assert r3.routing_tier == "TIER_0_5_SEMANTIC"
+
+    # 4. End-to-end ask_agent with Tier 0.5 routed query
+    full_res = ask_agent("what is our daily extraction volume in barrels")
+    assert full_res["intent"] == "FLEET_PRODUCTION"
+    assert "current_liquid_rate_bpd" in full_res["structured_data"]
+    print("PASSED: Tier 0.5 Semantic Vector Router verified across paraphrased queries.")
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("STARTING EXHAUSTIVE VERIFICATION FOR AGENT SERVICE V2")
@@ -296,8 +326,9 @@ if __name__ == "__main__":
     test_multi_turn_antecedent_resolution()
     test_streaming_ndjson_protocol()
     test_rest_ask_endpoints()
+    test_tier_0_5_semantic_routing()
 
     print("\n" + "=" * 70)
-    print("ALL 15 VERIFICATION SUITES PASSED GREEN (100% SUCCESS)!")
+    print("ALL 16 VERIFICATION SUITES PASSED GREEN (100% SUCCESS)!")
     print("AGENT SERVICE V2 IS HARDENED, COMPLETE, AND READY FOR HANDOFF.")
     print("=" * 70)

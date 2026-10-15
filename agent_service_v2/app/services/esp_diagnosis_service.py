@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.ai.client import llm_client
+from app.ai.semantic_router import semantic_router
 from app.db.esp_db import get_esp_cursor
 from app.schemas.esp_diagnosis import (
     ActiveWellSummary,
@@ -4251,6 +4252,41 @@ def route_query_hybrid(
             clarification_question="Which well or event would you like to inspect?",
             suggested_options=["FNW-001 (Recent Trip)", "FS-017 (Historical Incidents)", "FS-040 (Vibration)", "Fleet Inventory Overview"],
         )
+
+    # =========================================================================
+    # TIER 0.5: Local Semantic Vector Router (<5ms, zero LLM latency)
+    # Uses TF-IDF n-grams + Cosine Similarity over canonical intent centroids
+    # =========================================================================
+    try:
+        _, parsed_time_label = parse_temporal_window(question)
+        sem_match = semantic_router.match(question)
+        if sem_match and sem_match.is_confident:
+            logger.info(
+                f"[TIER 0.5 SEMANTIC ROUTER] Matched intent={sem_match.intent.value} "
+                f"(cosine_sim={sem_match.cosine_similarity}, confidence={sem_match.confidence}) "
+                f"for query='{question}'"
+            )
+            # Check if intent is single-well specific but no well was specified
+            if sem_match.intent in [ESPIntentEnum.EVENT_DIAGNOSE, ESPIntentEnum.WELL_HEALTH, ESPIntentEnum.WELL_HISTORY, ESPIntentEnum.PRODUCTION] and not norm_well:
+                return HybridRouteResult(
+                    intent=sem_match.intent,
+                    entity=None,
+                    confidence=sem_match.confidence,
+                    routing_tier="TIER_0_5_SEMANTIC",
+                    needs_clarification=True,
+                    clarification_question=f"Which well would you like to inspect for {sem_match.intent.value.replace('_', ' ').lower()}?",
+                    suggested_options=["FNW-001", "FS-017", "FS-004", "FS-006"],
+                )
+            return HybridRouteResult(
+                intent=sem_match.intent,
+                entity=norm_well or (all_wells[0] if all_wells else None),
+                entities=all_wells,
+                time_filter_label=parsed_time_label,
+                confidence=sem_match.confidence,
+                routing_tier="TIER_0_5_SEMANTIC",
+            )
+    except Exception as e:
+        logger.warning(f"Tier 0.5 Semantic Router pass failed: {e}")
 
     # TIER 1: Qwen 3B Constrained Intent Classifier for Ambiguous Prompts
     if llm_client.enabled:
