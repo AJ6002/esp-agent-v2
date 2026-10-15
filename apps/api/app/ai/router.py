@@ -20,6 +20,7 @@ from app.services.esp_diagnosis_service import (
     compare_event_before_after,
     rank_fleet_by_metric,
     diagnose_esp_event,
+    diagnose_running_well_degradation,
     get_fleet_alarm_timeline,
     get_fleet_anomaly_surfacing,
     get_fleet_executive_report,
@@ -251,10 +252,18 @@ def ask_agent(
         ev_id = route.entity if (route.entity and route.entity.startswith("EV-")) else None
         target_well = route.entity if (route.entity and not route.entity.startswith("EV-")) else (well_id or "FNW-001")
 
-        # Domain 12.1: False-Premise Refusal (Never diagnose a non-event on a nominal running well)
+        # Domain 4 / 12.1: False-Premise Refusal vs Live Running Well Degradation Diagnosis
         if not ev_id and target_well:
             is_running, snapshot = check_well_is_running_nominally(target_well)
-            if is_running:
+            q_lower = question.lower()
+            is_trip_query = any(w in q_lower for w in ["trip", "shutdown", "stopped", "failed", "offline", "cause of trip", "why did it stop"])
+            is_anomaly_or_health_query = any(w in q_lower for w in [
+                "declin", "drop", "drift", "anomaly", "health", "early warning", 
+                "about to fail", "vibrat", "reconcil", "wear", "overload", "status", "degrad"
+            ])
+
+            # If user asks why it tripped/stopped, but it's currently RUNNING nominally -> False-Premise Refusal
+            if is_running and is_trip_query and not is_anomaly_or_health_query:
                 fp_res = get_false_premise_refusal_report(target_well, snapshot)
                 return finalize_response({
                     "intent": "SAFETY_REFUSAL_FALSE_PREMISE",
@@ -263,6 +272,34 @@ def ask_agent(
                     "confidence": 0.99,
                     "needs_clarification": False,
                     "suggested_options": fp_res["suggested_options"],
+                })
+
+            # If well is running and the user wants a diagnosis or anomaly analysis (not a trip) -> Mode B (Live Running Degradation)
+            if is_running and (is_anomaly_or_health_query or "diagnos" in q_lower):
+                diag_res = diagnose_running_well_degradation(target_well, query=question)
+                session_manager.record_execution(
+                    session_id=session.session_id,
+                    intent="EVENT_DIAGNOSE",
+                    entity=target_well,
+                    event_id=diag_res.event_id,
+                    evidence=diag_res.structured_data,
+                    diagnosis=diag_res.structured_data,
+                    markdown_report=diag_res.markdown_report,
+                    page_route=page_route or session.active_page_route,
+                )
+                return finalize_response({
+                    "intent": "EVENT_DIAGNOSE",
+                    "markdown_text": diag_res.markdown_report,
+                    "structured_data": diag_res.structured_data,
+                    "confidence": float(diag_res.mathematical_confidence_pct) / 100.0,
+                    "needs_clarification": False,
+                    "suggested_options": [
+                        f"Well {target_well} Equalizer",
+                        f"Open Well View (/well-view/{target_well})",
+                        f"Dispatch Inspection Work Order for {target_well}",
+                        "What data did you use?",
+                        "What are the next diagnostic steps?",
+                    ],
                 })
 
         # Domain 12.2: Insufficient Evidence Check via Data Readiness Gate
@@ -281,7 +318,7 @@ def ask_agent(
 
         # Domain 3: Multi-Event Disambiguation (if multiple historical events exist and no specific event specified)
         if target_well and not ev_id:
-            is_explicit_latest = any(w in question.lower() for w in ["latest", "most recent", "last trip", "current trip", "newest", "diagnose latest"])
+            is_explicit_latest = any(w in question.lower() for w in ["latest", "most recent", "last trip", "current trip", "newest", "diagnose latest", "diagnose well", "diagnose "])
             recent_events = get_well_recent_events(target_well, limit=5)
             if len(recent_events) > 1 and not is_explicit_latest:
                 options = []
