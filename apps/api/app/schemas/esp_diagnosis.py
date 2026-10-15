@@ -115,6 +115,10 @@ class ESPIntentEnum(str, Enum):
     KNOWLEDGE = "KNOWLEDGE"
     WORK_ORDER_DISPATCH = "WORK_ORDER_DISPATCH"
     CHAT = "CHAT"
+    # Domain 11 Conversational Intents
+    EVIDENCE_INQUIRY = "EVIDENCE_INQUIRY"
+    FOLLOW_UP_JUSTIFY = "FOLLOW_UP_JUSTIFY"
+    GRAPH_EXPLAIN = "GRAPH_EXPLAIN"
 
 
 class RoutingTierEnum(str, Enum):
@@ -276,6 +280,26 @@ INTENT_ALIASES: dict[str, ESPIntentEnum] = {
     "CHAT": ESPIntentEnum.CHAT,
     "GREETING": ESPIntentEnum.CHAT,
     "CHITCHAT": ESPIntentEnum.CHAT,
+
+    # Domain 11 Conversational
+    "EVIDENCE_INQUIRY": ESPIntentEnum.EVIDENCE_INQUIRY,
+    "EVIDENCE": ESPIntentEnum.EVIDENCE_INQUIRY,
+    "DATA_SOURCE": ESPIntentEnum.EVIDENCE_INQUIRY,
+    "DATA_SOURCES": ESPIntentEnum.EVIDENCE_INQUIRY,
+    "RAW_DATA": ESPIntentEnum.EVIDENCE_INQUIRY,
+    "TELEMETRY_EVIDENCE": ESPIntentEnum.EVIDENCE_INQUIRY,
+
+    "FOLLOW_UP_JUSTIFY": ESPIntentEnum.FOLLOW_UP_JUSTIFY,
+    "JUSTIFY": ESPIntentEnum.FOLLOW_UP_JUSTIFY,
+    "JUSTIFICATION": ESPIntentEnum.FOLLOW_UP_JUSTIFY,
+    "WHY_FAULT": ESPIntentEnum.FOLLOW_UP_JUSTIFY,
+    "REASONING": ESPIntentEnum.FOLLOW_UP_JUSTIFY,
+
+    "GRAPH_EXPLAIN": ESPIntentEnum.GRAPH_EXPLAIN,
+    "CHART_EXPLAIN": ESPIntentEnum.GRAPH_EXPLAIN,
+    "EXPLAIN_CHART": ESPIntentEnum.GRAPH_EXPLAIN,
+    "EXPLAIN_GRAPH": ESPIntentEnum.GRAPH_EXPLAIN,
+    "VISUAL_EXPLAIN": ESPIntentEnum.GRAPH_EXPLAIN,
 }
 
 
@@ -299,6 +323,8 @@ class HybridRouteResult(BaseModel):
     needs_clarification: bool = False
     clarification_question: str | None = None
     suggested_options: list[str] = []
+    deferred_intent: dict[str, Any] | None = Field(default=None, description="Queued secondary intent from compound queries")
+
 
 
 class PetroleumChunk(BaseModel):

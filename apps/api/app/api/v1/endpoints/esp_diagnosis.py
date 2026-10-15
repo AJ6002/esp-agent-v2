@@ -126,10 +126,14 @@ def fleet_inventory_endpoint(cluster: str | None = Query(default=None)):
 
 
 @router.get("/route-intent", response_model=HybridRouteResult)
-def route_intent_endpoint(question: str = Query(..., min_length=1)):
+def route_intent_endpoint(
+    question: str = Query(..., min_length=1),
+    session_id: str | None = Query(default=None),
+    page_route: str | None = Query(default=None),
+):
     """Preview intent routing decision for a given maintenance query."""
     try:
-        return route_query_hybrid(question)
+        return route_query_hybrid(question, session_id=session_id, page_route=page_route)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Routing decision failed: {str(e)}")
 

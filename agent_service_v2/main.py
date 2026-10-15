@@ -98,6 +98,8 @@ async def stream_query_response(payload: QueryRequestPayload) -> AsyncGenerator[
             question=prompt,
             well_id=target_well,
             conversation_history=payload.conversation_history,
+            session_id=payload.session_id,
+            page_route=payload.page_route,
         )
 
         # Frame 3: Clarification Frame (if needed)
@@ -106,8 +108,15 @@ async def stream_query_response(payload: QueryRequestPayload) -> AsyncGenerator[
                 "type": "clarification",
                 "question": result.get("markdown_text", ""),
                 "options": result.get("suggested_options", []),
+                "session_id": result.get("session_id"),
             }) + "\n"
-            yield json.dumps({"type": "done", "status": "COMPLETED"}) + "\n"
+            yield json.dumps({
+                "type": "done",
+                "status": "COMPLETED",
+                "session_id": result.get("session_id"),
+                "intent": result.get("intent"),
+                "routing_tier": result.get("routing_tier"),
+            }) + "\n"
             return
 
         # Frame 4: Status (Synthesizing)
@@ -146,7 +155,13 @@ async def stream_query_response(payload: QueryRequestPayload) -> AsyncGenerator[
             }) + "\n"
 
         # Frame 7: Done Sentinel
-        yield json.dumps({"type": "done", "status": "COMPLETED"}) + "\n"
+        yield json.dumps({
+            "type": "done",
+            "status": "COMPLETED",
+            "session_id": result.get("session_id"),
+            "intent": result.get("intent"),
+            "routing_tier": result.get("routing_tier"),
+        }) + "\n"
 
     except Exception as e:
         logger.error(f"Error handling query: {e}", exc_info=True)
@@ -179,6 +194,8 @@ def ask_endpoint(payload: QueryRequestPayload):
         question=prompt,
         well_id=target_well,
         conversation_history=payload.conversation_history,
+        session_id=payload.session_id,
+        page_route=payload.page_route,
     )
     return {
         "answer": res.get("markdown_text", ""),
@@ -187,6 +204,8 @@ def ask_endpoint(payload: QueryRequestPayload):
         "structured_data": res.get("structured_data"),
         "needs_clarification": res.get("needs_clarification", False),
         "suggested_options": res.get("suggested_options", []),
+        "session_id": res.get("session_id"),
+        "routing_tier": res.get("routing_tier"),
     }
 
 

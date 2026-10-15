@@ -6,6 +6,7 @@ import logging
 import re
 from typing import Any
 
+from app.core.session import session_manager
 from app.schemas.esp_diagnosis import (
     DiagnoseEventRequest,
     ESPIntentEnum,
@@ -37,6 +38,10 @@ from app.services.esp_diagnosis_service import (
     get_well_production_metrics,
     route_query_hybrid,
     search_petroleum_kb,
+    get_evidence_inquiry_report,
+    get_follow_up_justification_report,
+    get_graph_explanation_report,
+    get_well_subsystem_reframe_report,
 )
 
 from app.ai.client import llm_client
@@ -48,6 +53,8 @@ def ask_agent(
     question: str,
     well_id: str | None = None,
     conversation_history: list[dict[str, Any]] | None = None,
+    session_id: str | None = None,
+    page_route: str | None = None,
 ) -> dict[str, Any]:
     """Execute query against deterministic physics tools & LLM synthesis.
     
@@ -59,15 +66,47 @@ def ask_agent(
             "confidence": float,
             "needs_clarification": bool,
             "suggested_options": list[str],
+            "session_id": str,
+            "routing_tier": str,
         }
     """
+    session, _ = session_manager.get_or_create(session_id)
+    if page_route:
+        session.active_page_route = page_route
+
     route: HybridRouteResult = route_query_hybrid(
-        question, conversation_history=conversation_history
+        question,
+        conversation_history=conversation_history,
+        session_id=session.session_id,
+        page_route=page_route or session.active_page_route,
     )
+
+    if route.deferred_intent:
+        session_manager.queue_deferred_intent(
+            session.session_id,
+            query=route.deferred_intent["query"],
+        )
+
+    def finalize_response(resp: dict[str, Any]) -> dict[str, Any]:
+        resp["session_id"] = session.session_id
+        resp["routing_tier"] = route.routing_tier
+        next_deferred = session_manager.peek_deferred_intent(session.session_id)
+        if next_deferred:
+            chip = f"[Continue: {next_deferred['query']}]"
+            suggested = resp.get("suggested_options") or []
+            if chip not in suggested:
+                resp["suggested_options"] = [chip] + suggested
+            if "Queued Follow-Up" not in resp.get("markdown_text", ""):
+                resp["markdown_text"] = (
+                    resp.get("markdown_text", "")
+                    + f"\n\n---\n> **Queued Follow-Up**: *'{next_deferred['query']}'* is queued in session memory. "
+                    f"Click **[Continue: {next_deferred['query']}]** or type `continue` to execute next."
+                )
+        return resp
 
     # 1. Clarification Needed
     if route.needs_clarification and not well_id:
-        return {
+        return finalize_response({
             "intent": route.intent.value,
             "markdown_text": (
                 f"### [ESP APM] Operational Clarification Required\n\n"
@@ -78,7 +117,7 @@ def ask_agent(
             "confidence": route.confidence,
             "needs_clarification": True,
             "suggested_options": route.suggested_options,
-        }
+        })
 
     # 2. Conversational Chit-Chat
     if route.intent == ESPIntentEnum.CHAT:
@@ -118,33 +157,88 @@ def ask_agent(
                 "- **Petroleum Engineering Standards**: E.g. *'What causes gas locking in an ESP?'*"
             )
 
-        return {
+        return finalize_response({
             "intent": "CHAT",
             "markdown_text": msg,
             "structured_data": None,
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["Fleet Status", "Diagnose FNW-001", "Compare FS-017 vs FS-040", "FS-017 History"],
-        }
+        })
+
+    # Domain 11.2: Evidence Inquiry ("What data did you use?")
+    if route.intent == ESPIntentEnum.EVIDENCE_INQUIRY:
+        ev_res = get_evidence_inquiry_report(session.session_id)
+        return finalize_response({
+            "intent": "EVIDENCE_INQUIRY",
+            "markdown_text": ev_res["markdown_report"],
+            "structured_data": ev_res["structured_data"],
+            "confidence": 0.99,
+            "needs_clarification": False,
+            "suggested_options": ev_res["suggested_options"],
+        })
+
+    # Domain 11.1: Follow-up on Prior Answer ("Why did you say X?")
+    if route.intent == ESPIntentEnum.FOLLOW_UP_JUSTIFY:
+        just_res = get_follow_up_justification_report(session.session_id, question)
+        return finalize_response({
+            "intent": "FOLLOW_UP_JUSTIFY",
+            "markdown_text": just_res["markdown_report"],
+            "structured_data": just_res["structured_data"],
+            "confidence": 0.98,
+            "needs_clarification": False,
+            "suggested_options": just_res["suggested_options"],
+        })
+
+    # Domain 11.3: Graph Explanation ("What does that chart mean?")
+    if route.intent == ESPIntentEnum.GRAPH_EXPLAIN:
+        graph_res = get_graph_explanation_report(page_route=page_route or session.active_page_route, question=question)
+        return finalize_response({
+            "intent": "GRAPH_EXPLAIN",
+            "markdown_text": graph_res["markdown_report"],
+            "structured_data": graph_res["structured_data"],
+            "confidence": 0.98,
+            "needs_clarification": graph_res.get("needs_clarification", False),
+            "suggested_options": graph_res.get("suggested_options", []),
+        })
 
     # 3. Trip Event Diagnosis
     if route.intent == ESPIntentEnum.EVENT_DIAGNOSE:
         ev_id = route.entity if (route.entity and route.entity.startswith("EV-")) else None
         target_well = route.entity if (route.entity and not route.entity.startswith("EV-")) else (well_id or "FNW-001")
         diag_res = diagnose_esp_event(DiagnoseEventRequest(event_id=ev_id, well_id=target_well))
-        return {
+
+        # Record execution snapshot in session
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="EVENT_DIAGNOSE",
+            entity=target_well,
+            event_id=ev_id or diag_res.event_id,
+            evidence=diag_res.structured_data,
+            diagnosis=diag_res.structured_data,
+            markdown_report=diag_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+
+        return finalize_response({
             "intent": "EVENT_DIAGNOSE",
             "markdown_text": diag_res.markdown_report,
             "structured_data": diag_res.structured_data,
             "confidence": float(diag_res.mathematical_confidence_pct) / 100.0,
             "needs_clarification": False,
-            "suggested_options": [f"Well {target_well} Health", f"Well {target_well} History", "Fleet Status"],
-        }
+            "suggested_options": [f"Well {target_well} Health", f"Well {target_well} History", "What data did you use?", "Why was it diagnosed?"],
+        })
 
     # 4. Fleet Inventory & Real-Time Status
     if route.intent == ESPIntentEnum.FLEET_INVENTORY:
         fleet_res = get_fleet_inventory_status(cluster=route.entity)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_INVENTORY",
+            entity=route.entity,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_INVENTORY",
             "markdown_text": fleet_res.markdown_report,
             "structured_data": {
@@ -158,266 +252,383 @@ def ask_agent(
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["FNW-001 Health", "FS-017 History", "Cluster 15", "Cluster 4"],
-        }
+        })
 
     # 4.1 Fleet Production & Deferment Summary (Domain 1.3)
     if route.intent == ESPIntentEnum.FLEET_PRODUCTION:
         prod_res = get_fleet_production_summary()
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_PRODUCTION",
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_PRODUCTION",
             "markdown_text": prod_res.markdown_report,
             "structured_data": prod_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Fleet Triage", "Executive Summary", "Fleet Anomalies", "Fleet Status"],
-        }
+        })
 
     # 4.2 Fleet Triage & Priority Ranking (Domain 1.4)
     if route.intent == ESPIntentEnum.FLEET_TRIAGE:
         triage_res = get_fleet_triage_ranking()
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_TRIAGE",
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_TRIAGE",
             "markdown_text": triage_res.markdown_report,
             "structured_data": triage_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Executive Summary", "Fleet Production", "Diagnose FNW-001", "Fleet Status"],
-        }
+        })
 
     # 4.3 Fleet Executive Briefing & KPI Reporting (Domain 1.5)
     if route.intent == ESPIntentEnum.FLEET_EXECUTIVE:
         exec_res = get_fleet_executive_report()
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_EXECUTIVE",
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_EXECUTIVE",
             "markdown_text": exec_res.markdown_report,
             "structured_data": exec_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Fleet Triage", "Fleet Production", "Fleet Anomalies", "Fleet Status"],
-        }
+        })
 
     # 4.4 Fleet Anomaly Surfacing & Early Warning (Domain 1.6)
     if route.intent == ESPIntentEnum.FLEET_ANOMALY:
         anomaly_res = get_fleet_anomaly_surfacing()
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_ANOMALY",
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_ANOMALY",
             "markdown_text": anomaly_res.markdown_report,
             "structured_data": anomaly_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Fleet Status", "Fleet Triage", "Executive Summary"],
-        }
+        })
 
     # 4.5 Fleet Alarm Timeline & Incident Clustering (Domain 1.7)
     if route.intent == ESPIntentEnum.FLEET_TIMELINE:
         timeline_res = get_fleet_alarm_timeline()
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_TIMELINE",
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_TIMELINE",
             "markdown_text": timeline_res.markdown_report,
             "structured_data": timeline_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Fleet Triage", "Executive Summary", "Fleet Status"],
-        }
+        })
 
     # 5. Multi-Well Comparison
     if route.intent == ESPIntentEnum.MULTI_WELL_COMPARE:
         comp_report = compare_multiple_wells(route.entities)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="MULTI_WELL_COMPARE",
+            entities=route.entities,
+            entity=route.entities[0] if route.entities else None,
+            markdown_report=comp_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "MULTI_WELL_COMPARE",
             "markdown_text": comp_report,
             "structured_data": {"wells": route.entities},
             "confidence": 0.95,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {w}" for w in route.entities] + ["Fleet Status"],
-        }
+        })
 
     # 6. Well Failure History
     if route.intent == ESPIntentEnum.WELL_HISTORY:
         target_well = route.entity or well_id or "FS-017"
         t_days = 7 if (route.time_filter_label and "7" in route.time_filter_label) else (30 if (route.time_filter_label and "30" in route.time_filter_label) else None)
         hist_res = get_well_historical_analysis(target_well, time_window_days=t_days, time_window_label=route.time_filter_label)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="WELL_HISTORY",
+            entity=target_well,
+            evidence=hist_res,
+            markdown_report=hist_res["markdown_report"],
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "WELL_HISTORY",
             "markdown_text": hist_res["markdown_report"],
             "structured_data": hist_res,
             "confidence": 0.95,
             "needs_clarification": False,
             "suggested_options": [f"Check {target_well} Health", f"Diagnose {target_well} Trip", "Fleet Status"],
-        }
+        })
 
-    # 7. Well Health Assessment
+    # 7. Well Health Assessment & Reframing Subsystems
     if route.intent == ESPIntentEnum.WELL_HEALTH:
         target_well = route.entity or well_id or "FNW-001"
+        is_reframe = any(p in question.lower() for p in ["what about", "how about", "check", "tell me about", "what is the"]) and any(
+            s in question.lower() for s in ["temp", "thermal", "heat", "vib", "shake", "current", "amp", "pip", "pressure", "flow"]
+        )
+        if is_reframe:
+            reframe_res = get_well_subsystem_reframe_report(target_well, question)
+            session_manager.record_execution(
+                session_id=session.session_id,
+                intent="WELL_HEALTH",
+                entity=target_well,
+                evidence=reframe_res["structured_data"],
+                markdown_report=reframe_res["markdown_report"],
+                page_route=page_route or session.active_page_route,
+            )
+            return finalize_response({
+                "intent": "WELL_HEALTH",
+                "markdown_text": reframe_res["markdown_report"],
+                "structured_data": reframe_res["structured_data"],
+                "confidence": 0.96,
+                "needs_clarification": False,
+                "suggested_options": reframe_res["suggested_options"],
+            })
+
         health_res = get_well_health_status(target_well)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="WELL_HEALTH",
+            entity=target_well,
+            evidence=health_res.dict(),
+            markdown_report=health_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "WELL_HEALTH",
             "markdown_text": health_res.markdown_report,
             "structured_data": health_res.dict(),
             "confidence": 0.96,
             "needs_clarification": False,
-            "suggested_options": [f"Diagnose {target_well}", f"History {target_well}", "Fleet Status"],
-        }
+            "suggested_options": [f"Diagnose {target_well}", f"History {target_well}", "What about temperature?", "Fleet Status"],
+        })
 
     # 8. Production Telemetry
     if route.intent == ESPIntentEnum.PRODUCTION:
         target_well = route.entity or well_id or "FS-017"
         prod_res = get_well_production_metrics(target_well)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="PRODUCTION",
+            entity=target_well,
+            evidence=prod_res.dict(),
+            markdown_report=prod_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "PRODUCTION",
             "markdown_text": prod_res.markdown_report,
             "structured_data": prod_res.dict(),
             "confidence": 0.95,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {target_well}", "Fleet Status"],
-        }
+        })
 
     # 8.1 Gathering Cluster Comparison (Domain 2)
     if route.intent == ESPIntentEnum.CLUSTER_COMPARE:
         c1 = route.entities[0] if len(route.entities) > 0 else "15"
         c2 = route.entities[1] if len(route.entities) > 1 else "4"
         comp_res = compare_gathering_clusters(c1, c2)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="CLUSTER_COMPARE",
+            entities=route.entities,
+            evidence=comp_res.dict(),
+            markdown_report=comp_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "CLUSTER_COMPARE",
             "markdown_text": comp_res.markdown_report,
             "structured_data": comp_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Compare Cluster 15 vs Cluster 3", "Show total fleet production", "Fleet Status"],
-        }
+        })
 
     # 8.2 Historical Baseline Comparison (Domain 2)
     if route.intent == ESPIntentEnum.HISTORICAL_COMPARE:
         target_well = route.entity or well_id or "FS-004"
         b_res = compare_well_historical(target_well)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="HISTORICAL_COMPARE",
+            entity=target_well,
+            evidence=b_res.dict(),
+            markdown_report=b_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "HISTORICAL_COMPARE",
             "markdown_text": b_res.markdown_report,
             "structured_data": b_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {target_well}", f"Benchmark {target_well} vs peers", "Fleet Status"],
-        }
+        })
 
     # 8.3 Cluster Peer Benchmarking (Domain 2)
     if route.intent == ESPIntentEnum.PEER_BENCHMARK:
         target_well = route.entity or well_id or "FS-017"
         peer_res = benchmark_well_against_peers(target_well)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="PEER_BENCHMARK",
+            entity=target_well,
+            evidence=peer_res.dict(),
+            markdown_report=peer_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "PEER_BENCHMARK",
             "markdown_text": peer_res.markdown_report,
             "structured_data": peer_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {target_well}", f"Show baseline for {target_well}", "Rank wells by vibration"],
-        }
+        })
 
     # 8.4 Event Telemetry Comparison (Domain 2)
     if route.intent == ESPIntentEnum.EVENT_BEFORE_AFTER:
         ev_id = route.entity or "EV-20261012-101438-FS-017-571"
         ev_res = compare_event_before_after(ev_id)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="EVENT_BEFORE_AFTER",
+            entity=ev_id,
+            evidence=ev_res.dict(),
+            markdown_report=ev_res.markdown_report,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "EVENT_BEFORE_AFTER",
             "markdown_text": ev_res.markdown_report,
             "structured_data": ev_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose event {ev_id}", "Fleet Status"],
-        }
+        })
 
     # 8.5 Fleet Leaderboards & Metric Ranking (Domain 2)
     if route.intent == ESPIntentEnum.FLEET_RANKING:
         metric = route.entity or "vibration"
         rank_res = rank_fleet_by_metric(metric)
-        return {
+        session_manager.record_execution(
+            session_id=session.session_id,
+            intent="FLEET_RANKING",
+            entity=metric,
+            page_route=page_route or session.active_page_route,
+        )
+        return finalize_response({
             "intent": "FLEET_RANKING",
             "markdown_text": rank_res.markdown_report,
             "structured_data": rank_res.dict(),
             "confidence": 0.98,
             "needs_clarification": False,
             "suggested_options": ["Rank wells by water cut", "Rank wells by motor current", "Fleet Triage"],
-        }
+        })
 
     # 8.6 Domain 10: Self-Knowledge & Identity Dispatches
     if route.intent == ESPIntentEnum.SELF_IDENTITY:
         id_res = get_self_identity()
-        return {
+        return finalize_response({
             "intent": "SELF_IDENTITY",
             "markdown_text": id_res.markdown_report,
             "structured_data": id_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["What can you do?", "What can't you do?", "Which wells do you know about?"],
-        }
+        })
 
     if route.intent == ESPIntentEnum.SELF_CAPABILITIES:
         cap_res = get_self_capabilities()
-        return {
+        return finalize_response({
             "intent": "SELF_CAPABILITIES",
             "markdown_text": cap_res.markdown_report,
             "structured_data": cap_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["Show fleet inventory", "Compare Cluster 15 vs Cluster 4", "What can't you do?"],
-        }
+        })
 
     if route.intent == ESPIntentEnum.SELF_BOUNDARIES:
         bnd_res = get_self_boundaries()
-        return {
+        return finalize_response({
             "intent": "SELF_BOUNDARIES",
             "markdown_text": bnd_res.markdown_report,
             "structured_data": bnd_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["What can you do?", "What are your limitations?", "Which wells do you know about?"],
-        }
+        })
 
     if route.intent == ESPIntentEnum.SELF_FLEET_SCOPE:
         scope_res = get_self_fleet_scope()
-        return {
+        return finalize_response({
             "intent": "SELF_FLEET_SCOPE",
             "markdown_text": scope_res.markdown_report,
             "structured_data": scope_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["Show total fleet production", "Fleet triage ranking", "Compare Cluster 15 vs Cluster 4"],
-        }
+        })
 
     if route.intent == ESPIntentEnum.SELF_TASKS:
         tasks_res = get_self_tasks()
-        return {
+        return finalize_response({
             "intent": "SELF_TASKS",
             "markdown_text": tasks_res.markdown_report,
             "structured_data": tasks_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["Executive morning briefing", "Fleet triage ranking", "What can't you do?"],
-        }
+        })
 
     if route.intent == ESPIntentEnum.SELF_LIMITATIONS:
         lim_res = get_self_limitations()
-        return {
+        return finalize_response({
             "intent": "SELF_LIMITATIONS",
             "markdown_text": lim_res.markdown_report,
             "structured_data": lim_res.dict(),
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["What can you do?", "What are your boundaries?", "Which wells do you know about?"],
-        }
+        })
 
     # 3.9 UI Navigation & Platform Route Intelligence (Domain 9)
     if route.intent == ESPIntentEnum.UI_NAVIGATION:
         ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
         event_id = ev_match.group(1) if ev_match else None
         nav_res = get_ui_navigation_narrative(question, entity=route.entity, event_id=event_id)
-        return {
+        return finalize_response({
             "intent": "UI_NAVIGATION",
             "markdown_text": nav_res.markdown_report,
             "structured_data": nav_res.dict(),
             "confidence": 0.99,
             "needs_clarification": False,
             "suggested_options": nav_res.suggested_options,
-        }
+        })
 
     # 3.10 Work Order Dispatch & Autonomous Safety Preparation
     if route.intent == ESPIntentEnum.WORK_ORDER_DISPATCH:
@@ -456,7 +667,7 @@ def ask_agent(
             f"> *Safety Notice: Work order is staged in read-only advisory decision-support mode. Physical dispatch requires field engineer authorization.*\n"
         )
 
-        return {
+        return finalize_response({
             "intent": "WORK_ORDER_DISPATCH",
             "markdown_text": md,
             "structured_data": {
@@ -470,7 +681,7 @@ def ask_agent(
             "confidence": 0.99,
             "needs_clarification": False,
             "suggested_options": [f"Diagnose {target_well}", f"Check {target_well} Health", "Fleet Status"],
-        }
+        })
 
     # 9. Petroleum Engineering Knowledge RAG
     chunks = search_petroleum_kb(question, limit=3)
@@ -498,11 +709,11 @@ def ask_agent(
         else:
             kb_text = "Hello! I am your ESP APM Maintenance Copilot. You can ask me to diagnose well trip events, check fleet inventory, or inspect well health baselines."
 
-    return {
+    return finalize_response({
         "intent": "KNOWLEDGE",
         "markdown_text": kb_text,
         "structured_data": {"chunks_count": len(chunks)},
         "confidence": 0.90,
         "needs_clarification": False,
         "suggested_options": ["Fleet Status", "Diagnose FNW-001", "Check FS-017 Health", "Compare FS-017 vs FS-040"],
-    }
+    })
