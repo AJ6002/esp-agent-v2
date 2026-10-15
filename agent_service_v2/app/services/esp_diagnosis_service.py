@@ -3961,14 +3961,15 @@ def route_query_hybrid(
         hist_comp_words = [
             "baseline", "historical", "last week", "prior", "yesterday", "past vs present",
             "current vs baseline", "vs prior", "vs history", "vs last week", "historical comparison",
-            "compare with baseline", "operating baseline", "24h vs"
+            "compare with baseline", "operating baseline", "24h vs", "design envelope",
+            "operating envelope", "drifted from design", "design model", "drifted from baseline", "envelope"
         ]
         if any(hw in q_lower for hw in hist_comp_words):
             return HybridRouteResult(
                 intent=ESPIntentEnum.HISTORICAL_COMPARE,
                 entity=single_well,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
 
         # Peer Benchmarking (Capability 2.4)
@@ -4074,15 +4075,16 @@ def route_query_hybrid(
         triage_words = [
             "fleet triage", "triage wells", "triage ranking", "rank wells by severity",
             "which well to fix first", "which wells need intervention", "priority wells",
-            "maintenance prioritization", "triage matrix", "rank offline wells",
-            "triage", "highest risk", "triage list", "triage priority", "risk wells"
+            "maintenance prioritization", "triage matrix", "rank offline wells", "rank offline",
+            "rank offline tripped", "crew dispatch", "revenue impact", "offline intervention",
+            "intervention queue", "triage", "highest risk", "triage list", "triage priority", "risk wells"
         ]
         if any(w in q_lower for w in triage_words):
             return HybridRouteResult(
                 intent=ESPIntentEnum.FLEET_TRIAGE,
                 entity=None,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
 
         # 1.5 Fleet Executive Briefing & KPI Reporting
@@ -4096,21 +4098,22 @@ def route_query_hybrid(
                 intent=ESPIntentEnum.FLEET_EXECUTIVE,
                 entity=None,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
 
         # 1.6 Fleet Anomaly Surfacing & Early Warning
         anomaly_words = [
             "fleet anomal", "anomalous well", "which wells are anomalous", "wells degrading",
             "sub-trip anomal", "early warning", "anomaly surfacing", "drift that hasn't",
-            "running wells with drift", "unhealthy running wells"
+            "running wells with drift", "unhealthy running wells", "incipient", "thermal drift",
+            "vibration drift", "running pumps showing", "running pumps with drift"
         ]
         if any(w in q_lower for w in anomaly_words):
             return HybridRouteResult(
                 intent=ESPIntentEnum.FLEET_ANOMALY,
                 entity=None,
                 confidence=0.98,
-                routing_tier="TIER_0_REGEX",
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
 
         # 1.7 Fleet Alarm Timeline & Incident Clustering
@@ -4206,7 +4209,7 @@ def route_query_hybrid(
                 routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         # 2. Active Trip / Shutdown Event Diagnosis
-        if any(w in q_lower for w in ["trip", "diagnos", "shutdown", "shutdwn", "what happened", "why did it stop", "why did it shut", "why did it trip", "failure event", "fault event"]):
+        if any(w in q_lower for w in ["trip", "diagnos", "shutdown", "shutdwn", "what happened", "why did it stop", "why did it shut", "why did it trip", "failure event", "fault event", "root cause", "failure signature", "failure mode"]):
             return HybridRouteResult(
                 intent=ESPIntentEnum.EVENT_DIAGNOSE,
                 entity=event_id or norm_well,
