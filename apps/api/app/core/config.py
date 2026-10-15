@@ -33,13 +33,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = DEFAULT_SECRET_KEY
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    # AI
-    AI_ENABLED: bool = False
-    LLM_API_BASE: str = "https://api.openai.com/v1"
-    LLM_API_KEY: str = ""
-    LLM_MODEL: str = "gpt-4o-mini"
+    AI_ENABLED: bool = True
+    LLM_API_BASE: str = "http://192.168.1.188:8080/v1"
+    LLM_API_KEY: str = "not-needed"
+    LLM_MODEL: str = "Qwen2.5-Coder-3B-Instruct-Q4_K_M"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
-    AI_REQUEST_TIMEOUT_SECONDS: int = 30
+    AI_REQUEST_TIMEOUT_SECONDS: int = 60
 
     # Transition high-risk commands exceeding timeout to manual verification.
     EQUIPMENT_COMMAND_TIMEOUT_SECONDS: int = Field(default=300, ge=30, le=3600)
