@@ -3865,6 +3865,8 @@ def route_query_hybrid(
         "page", "screen", "route", "workspace", "navigation", "ui", "view", "menu",
         "navigate to", "where can i find", "where is the", "where are the", "where are",
         "how to get to", "how do i get to", "where do i find", "in the platform",
+        "where can i see", "where do i see", "where can i view", "where do i view",
+        "how do i see", "how can i see", "how to see", "how do i view", "how do i download",
         "show all screens", "list all screens", "show all routes", "list all routes",
         "working status", "fleet cockpit", "well monitor", "well detail",
         "live calculations", "event intelligence", "reports hub", "scenario simulator",
@@ -4053,7 +4055,9 @@ def route_query_hybrid(
             "production deferment", "fleet output", "fleet capacity", "total bpd",
             "gross liquid across fleet", "oil lost across fleet", "fleet bpd", "fleet bopd",
             "gross liquid", "net oil", "daily production", "gross production", "oil production",
-            "liquid production", "daily gross liquid", "oil lost"
+            "liquid production", "daily gross liquid", "oil lost", "how much oil",
+            "oil are we producing", "are we producing", "producing across the fleet",
+            "current production", "oil rate", "liquid rate"
         ]
         if any(w in q_lower for w in prod_words):
             return HybridRouteResult(
@@ -4067,7 +4071,8 @@ def route_query_hybrid(
         triage_words = [
             "fleet triage", "triage wells", "triage ranking", "rank wells by severity",
             "which well to fix first", "which wells need intervention", "priority wells",
-            "maintenance prioritization", "triage matrix", "rank offline wells"
+            "maintenance prioritization", "triage matrix", "rank offline wells",
+            "triage", "highest risk", "triage list", "triage priority", "risk wells"
         ]
         if any(w in q_lower for w in triage_words):
             return HybridRouteResult(

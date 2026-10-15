@@ -45,7 +45,8 @@ app.add_middleware(
 
 class QueryRequestPayload(BaseModel):
     session_id: str | None = None
-    message: str
+    message: str | None = None
+    question: str | None = None
     well_id: str | None = None
     asset_id: str | None = None
     page_route: str | None = None
@@ -90,9 +91,11 @@ async def stream_query_response(payload: QueryRequestPayload) -> AsyncGenerator[
             "message": "Querying Server 184 SCADA telemetry & physics baseline models...",
         }) + "\n"
 
+        prompt = payload.message or payload.question or ""
+
         # Execute deterministic logic + LLM synthesis
         result = ask_agent(
-            question=payload.message,
+            question=prompt,
             well_id=target_well,
             conversation_history=payload.conversation_history,
         )
@@ -126,19 +129,19 @@ async def stream_query_response(payload: QueryRequestPayload) -> AsyncGenerator[
             }) + "\n"
 
         # Frame 6: Advisory Frame (if structured diagnosis data exists)
-        if result.get("intent") == "EVENT_DIAGNOSE" and result.get("structured_data"):
+        if result.get("intent") in ["EVENT_DIAGNOSE", "WORK_ORDER_DISPATCH"] and result.get("structured_data"):
             s_data = result["structured_data"]
             yield json.dumps({
                 "type": "advisory",
                 "advisory": {
                     "event_id": s_data.get("event_id"),
                     "well_id": s_data.get("well_id"),
-                    "trip_cause": s_data.get("trip_cause"),
-                    "severity": s_data.get("severity"),
+                    "trip_cause": s_data.get("trip_cause") or s_data.get("diagnosed_fault"),
+                    "severity": s_data.get("severity") or s_data.get("priority"),
                     "confidence": result.get("confidence", 0.95),
                     "hypotheses": s_data.get("hypotheses", []),
                     "deviations": s_data.get("deviations", []),
-                    "next_steps": s_data.get("next_steps", []),
+                    "next_steps": s_data.get("next_steps", []) or s_data.get("loto_checklist", []),
                 },
             }) + "\n"
 
@@ -161,6 +164,30 @@ async def query_endpoint(payload: QueryRequestPayload):
         stream_query_response(payload),
         media_type="application/x-ndjson",
     )
+
+
+@app.post("/ask")
+@app.post("/api/v1/esp/ask")
+def ask_endpoint(payload: QueryRequestPayload):
+    target_well = payload.well_id or payload.asset_id
+    if payload.page_route and not target_well:
+        parts = payload.page_route.strip("/").split("/")
+        if len(parts) >= 2 and parts[0] == "wells":
+            target_well = parts[1]
+    prompt = payload.question or payload.message or ""
+    res = ask_agent(
+        question=prompt,
+        well_id=target_well,
+        conversation_history=payload.conversation_history,
+    )
+    return {
+        "answer": res.get("markdown_text", ""),
+        "intent": res.get("intent"),
+        "confidence": res.get("confidence", 0.95),
+        "structured_data": res.get("structured_data"),
+        "needs_clarification": res.get("needs_clarification", False),
+        "suggested_options": res.get("suggested_options", []),
+    }
 
 
 if __name__ == "__main__":

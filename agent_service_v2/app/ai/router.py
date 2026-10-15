@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from app.schemas.esp_diagnosis import (
@@ -416,6 +417,59 @@ def ask_agent(
             "confidence": 0.99,
             "needs_clarification": False,
             "suggested_options": nav_res.suggested_options,
+        }
+
+    # 3.10 Work Order Dispatch & Autonomous Safety Preparation
+    if route.intent == ESPIntentEnum.WORK_ORDER_DISPATCH:
+        target_well = route.entity or well_id or "FNW-001"
+        esp_res = diagnose_esp_event(DiagnoseEventRequest(well_id=target_well))
+        p_fault = esp_res.structured_data.get("signature", {}).get("fault_name") or esp_res.trip_cause or "ESP Shutdown"
+        ev_id = esp_res.event_id
+        wo_code = f"WO-ESP-{target_well}-AUTO"
+
+        loto_checklist = [
+            "[CRITICAL] MANDATORY LOTO: De-energize and Lockout/Tagout VSD surface switchboard and main feeder.",
+            "[CRITICAL] ZERO-ENERGY VERIFICATION: Test all incoming and motor leads with 1000V calibrated multimeter.",
+            "[CRITICAL] HYDRAULIC ISOLATION: Close wing valve, master valve, and dissipate wellhead flowline trapped pressure.",
+            "[DIAGNOSIS] VSD FAULT LOG AUDIT: Extract VSD memory fault codes and trip event logs for target well.",
+            "[ELECTRICAL] ELECTRICAL MEGGER TEST: Measure Phase-to-Phase and Phase-to-Ground resistance (min 10 MΩ).",
+            "[MECHANICAL] MECHANICAL FREE ROTATION: Rotate shaft with drive turning tool; verify zero drag or impeller seizure.",
+            "[OPERATIONS] WELLHEAD INTEGRITY: Inspect surface sand desander trap and measure BS&W solids cut.",
+            "[SAFETY SIGN-OFF] PRE-RESTART APPROVAL: Review echometer fluid level and obtain Petroleum Production Engineer sign-off."
+        ]
+
+        md = (
+            f"# [ESP APM] Autonomous Work Order Dispatch\n\n"
+            f"**Work Order Code**: `{wo_code}` | **Priority**: `P1 - CRITICAL` | **Status**: `STAGED_PENDING_APPROVAL`\n\n"
+            f"### Target Asset\n"
+            f"- **Well Identifier**: `{target_well}`\n"
+            f"- **Associated Event**: `{ev_id}`\n"
+            f"- **Diagnosed Root Cause**: `{p_fault}`\n\n"
+            f"### ⚠️ Mandatory Lockout/Tagout (LOTO) Safety Protocol\n"
+            + "\n".join([f"- {item}" for item in loto_checklist]) + "\n\n"
+            f"### Acceptance & Sign-off Criteria\n"
+            f"1. Verified zero-energy state via multimeter test.\n"
+            f"2. Motor insulation resistance > 10 MΩ via 1000V Megger.\n"
+            f"3. Free manual drive rotation with turning tool.\n"
+            f"4. Petroleum Production Engineer and Electrical Supervisor signed approval.\n\n"
+            f"---\n"
+            f"> *Safety Notice: Work order is staged in read-only advisory decision-support mode. Physical dispatch requires field engineer authorization.*\n"
+        )
+
+        return {
+            "intent": "WORK_ORDER_DISPATCH",
+            "markdown_text": md,
+            "structured_data": {
+                "work_order_code": wo_code,
+                "priority": "P1",
+                "well_id": target_well,
+                "event_id": ev_id,
+                "diagnosed_fault": p_fault,
+                "loto_checklist": loto_checklist,
+            },
+            "confidence": 0.99,
+            "needs_clarification": False,
+            "suggested_options": [f"Diagnose {target_well}", f"Check {target_well} Health", "Fleet Status"],
         }
 
     # 9. Petroleum Engineering Knowledge RAG
