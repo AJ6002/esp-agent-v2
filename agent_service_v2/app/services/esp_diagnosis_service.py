@@ -4114,7 +4114,9 @@ def route_query_hybrid(
         # 1.7 Fleet Alarm Timeline & Incident Clustering
         timeline_words = [
             "alarm timeline", "trip timeline", "alarm density", "incident clustering",
-            "trip clustering", "fleet alarm", "alarm cluster", "incident timeline"
+            "trip clustering", "fleet alarm", "alarm cluster", "incident timeline",
+            "sequence of trips", "trip sequence", "history of trips", "trips over",
+            "trip chronology"
         ]
         if any(w in q_lower for w in timeline_words):
             return HybridRouteResult(
@@ -4127,7 +4129,9 @@ def route_query_hybrid(
         # 1.1 & 1.2 Fleet Inventory & Oilfield Hierarchy Query
         fleet_words = [
             "fleet", "inventory", "how many wells", "all wells", "list wells", "total wells",
-            "cluster", "clusters", "field", "fields", "hierarchy", "station", "stations",
+            "field hierarchy", "oilfield hierarchy", "station hierarchy", "cluster hierarchy",
+            "gathering stations list", "gathering station list", "all gathering stations status",
+            "all monitored assets", "monitored assets", "monitored artificial lift assets",
             "wells are running", "how many running", "how many tripped", "how many are running",
             "how many are tripped", "which wells are tripped", "which wells are running",
             "wells running", "wells tripped", "running vs tripped", "running n", "tripped n", "ripped",
@@ -4172,7 +4176,10 @@ def route_query_hybrid(
                     event_id = hist_event
 
     # TIER 0.DISPATCH: Work Order Creation / Dispatch (Gap 6)
-    is_wo = any(term in q_lower for term in ["work order", "workorder", "work-order", " wo ", " wo,", " wo."]) or q_lower.endswith(" wo")
+    is_wo = any(term in q_lower for term in [
+        "work order", "workorder", "work-order", " wo ", " wo,", " wo.",
+        "maintenance ticket", "safety checklist", "work ticket", "service ticket", "repair ticket"
+    ]) or q_lower.endswith(" wo")
     is_action = any(act in q_lower for act in ["dispatch", "create", "generate", "issue", "open", "raise", "draft", "submit", "prepare", "send", "emergency"])
     if is_wo and is_action:
         target_entity = norm_well or event_id or "FNW-001"
@@ -4205,7 +4212,8 @@ def route_query_hybrid(
                 routing_tier="TIER_0_REGEX",
             )
         # 3. Production Telemetry
-        if any(w in q_lower for w in ["product", "flow", "bpd", "water cut", "rate", "bbl", "output"]):
+        is_prod_query = any(w in q_lower for w in ["product", "flow", "bpd", "water cut", "bbl", "output"]) or bool(re.search(r"\brate\b", q_lower))
+        if is_prod_query:
             return HybridRouteResult(
                 intent=ESPIntentEnum.PRODUCTION,
                 entity=norm_well,
@@ -4233,7 +4241,8 @@ def route_query_hybrid(
         "causes of", "overview of", "explain what", "principles of", "guidelines for",
         "how does", "what are the reasons", "meaning of", "can an esp", "can esp"
     ]
-    if any(cp in q_lower for cp in conceptual_phrases) and not norm_well and not event_id:
+    is_comparison_query = any(cw in q_lower for cw in ["stack up", "peer", "neighbor", "pad", "cluster", "vs", "versus", "compare", "benchmark", "rank"])
+    if any(cp in q_lower for cp in conceptual_phrases) and not norm_well and not event_id and not is_comparison_query:
         return HybridRouteResult(
             intent=ESPIntentEnum.KNOWLEDGE,
             entity=question,

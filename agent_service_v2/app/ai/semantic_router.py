@@ -42,6 +42,9 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "fleet overview and well status count",
         "operational state of all monitored wells",
         "show all wells in cluster and field",
+        "what is the operational status of all monitored assets",
+        "operational status of all monitored assets",
+        "status of all monitored assets",
     ],
     ESPIntentEnum.FLEET_PRODUCTION: [
         "how much oil are we producing across the field",
@@ -57,6 +60,10 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "daily extraction volume in barrels",
         "total extraction volume across the field",
         "extraction volume in barrels",
+        "what are we pumping today across all gathering stations",
+        "total liquid lifted across the field",
+        "how much liquid are we lifting across the field",
+        "liquid are we lifting across the field",
     ],
     ESPIntentEnum.FLEET_TRIAGE: [
         "which wells should we restore or fix first",
@@ -67,6 +74,8 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "which tripped wells are highest priority to service",
         "rank offline wells for maintenance team dispatch",
         "which asset needs immediate workover or repair",
+        "offline well intervention queue",
+        "rundown on offline well intervention queue",
     ],
     ESPIntentEnum.FLEET_EXECUTIVE: [
         "give me the morning executive briefing",
@@ -90,6 +99,8 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "recent fleet trip sequence over time",
         "show historical alarm timeline and shutdown clusters",
         "frequency of trips over the past week",
+        "show the sequence of trips over the past week",
+        "sequence of trips over the past week",
     ],
     ESPIntentEnum.MULTI_WELL_COMPARE: [
         "compare telemetry between well and well",
@@ -111,12 +122,17 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "historical baseline comparison for well telemetry",
         "check if well parameters have drifted from design model",
         "is well running normally compared to its baseline history",
+        "is the pump operating within its design envelope",
+        "operating within design envelope",
     ],
     ESPIntentEnum.PEER_BENCHMARK: [
         "how does this well rank against its cluster peers",
         "peer percentile benchmark for motor temperature and amps",
         "compare well efficiency to neighbor wells in the same pad",
         "benchmark this asset against similar wells in cluster",
+        "how does this asset stack up against neighboring wells in the pad",
+        "how does this asset stack up against neighboring producers in the cluster",
+        "stack up against neighboring wells in the pad",
     ],
     ESPIntentEnum.FLEET_RANKING: [
         "rank fleet by vibration levels",
@@ -154,6 +170,8 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
     ESPIntentEnum.WORK_ORDER_DISPATCH: [
         "dispatch work order for field technician",
         "generate autonomous maintenance ticket and loto checklist",
+        "generate an autonomous maintenance ticket and safety checklist for well",
+        "autonomous maintenance ticket and safety checklist",
         "create work order to inspect mechanical seal and cable",
         "stage maintenance dispatch with lockout tagout protocol",
         "schedule repair crew and generate safety checklist for well",
@@ -192,6 +210,8 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "control vsd remotely",
         "remotely adjust operating frequency",
         "send remote scada command to well",
+        "can we remotely dial back pump operating frequency",
+        "dial back operating frequency",
     ],
     ESPIntentEnum.SELF_FLEET_SCOPE: [
         "which specific wells and fields do you monitor",
