@@ -92,33 +92,33 @@ class TestDomain11Conversational(unittest.TestCase):
         """11.5 Multi-turn context & 11.6 Pronoun resolution: 'it' binds to session well."""
         sess_id = "sess_test_pronoun_001"
 
-        # Turn 1: Inspect well FS-004
-        res1 = ask_agent("What is the health status of well FS-004?", session_id=sess_id)
+        # Turn 1: Inspect tripped well FS-017
+        res1 = ask_agent("What is the health status of well FS-017?", session_id=sess_id)
         self.assertEqual(res1["intent"], "WELL_HEALTH")
-        self.assertIn("FS-004", res1["markdown_text"])
+        self.assertIn("FS-017", res1["markdown_text"])
 
         # Turn 2: Query using pronoun "its" without mentioning well name
         res2 = ask_agent("Why did it trip?", session_id=sess_id)
         self.assertEqual(res2["intent"], "EVENT_DIAGNOSE")
-        self.assertIn("FS-004", res2["markdown_text"])
+        self.assertIn("FS-017", res2["markdown_text"])
 
         # Turn 3: Query using "that well"
         res3 = ask_agent("Show past trips for that well", session_id=sess_id)
         self.assertEqual(res3["intent"], "WELL_HISTORY")
-        self.assertIn("FS-004", res3["markdown_text"])
+        self.assertIn("FS-017", res3["markdown_text"])
         print("PASS: 11.5 Multi-turn context & 11.6 Pronoun resolution verified.")
 
     def test_11_7_compound_query_deferred_intent(self):
         """11.7 Deferred Intent Handling: Compound query splits primary and queues secondary."""
         sess_id = "sess_test_compound_001"
 
-        # Turn 1: Compound query with "and also"
-        compound_q = "Diagnose well FS-004 and also show fleet inventory"
+        # Turn 1: Compound query with "and also" on tripped well FS-017
+        compound_q = "Diagnose well FS-017 and also show fleet inventory"
         res1 = ask_agent(compound_q, session_id=sess_id)
         
         # Primary query executed immediately
         self.assertEqual(res1["intent"], "EVENT_DIAGNOSE")
-        self.assertIn("FS-004", res1["markdown_text"])
+        self.assertIn("FS-017", res1["markdown_text"])
         
         # Interactive continuation chip and footer banner present
         self.assertTrue(any("Continue: show fleet inventory" in opt for opt in res1["suggested_options"]))

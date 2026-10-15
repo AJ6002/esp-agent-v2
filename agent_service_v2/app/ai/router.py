@@ -42,6 +42,13 @@ from app.services.esp_diagnosis_service import (
     get_follow_up_justification_report,
     get_graph_explanation_report,
     get_well_subsystem_reframe_report,
+    check_well_is_running_nominally,
+    check_well_telemetry_readiness,
+    get_false_premise_refusal_report,
+    get_data_readiness_refusal_report,
+    get_unknown_asset_refusal_report,
+    get_out_of_scope_refusal_report,
+    VALID_FLEET_WELLS,
 )
 
 from app.ai.client import llm_client
@@ -202,10 +209,75 @@ def ask_agent(
             "suggested_options": graph_res.get("suggested_options", []),
         })
 
+    # Domain 12.4: Out-of-Scope Query Refusal
+    if route.intent == ESPIntentEnum.SAFETY_REFUSAL_OUT_OF_SCOPE:
+        scope_res = get_out_of_scope_refusal_report(question)
+        return finalize_response({
+            "intent": "SAFETY_REFUSAL_OUT_OF_SCOPE",
+            "markdown_text": scope_res["markdown_report"],
+            "structured_data": scope_res["structured_data"],
+            "confidence": 0.99,
+            "needs_clarification": False,
+            "suggested_options": scope_res["suggested_options"],
+        })
+
+    # Domain 12.5: Unknown Asset Refusal & Fuzzy Disambiguation
+    if route.intent == ESPIntentEnum.SAFETY_REFUSAL_UNKNOWN_ASSET:
+        asset_res = get_unknown_asset_refusal_report(route.entity or question)
+        return finalize_response({
+            "intent": "SAFETY_REFUSAL_UNKNOWN_ASSET",
+            "markdown_text": asset_res["markdown_report"],
+            "structured_data": asset_res["structured_data"],
+            "confidence": route.confidence,
+            "needs_clarification": route.needs_clarification,
+            "suggested_options": route.suggested_options or asset_res["suggested_options"],
+        })
+
+    # Domain 12.2: Insufficient Evidence Refusal
+    if route.intent == ESPIntentEnum.SAFETY_REFUSAL_INSUFFICIENT_EVIDENCE:
+        evidence_res = get_data_readiness_refusal_report(route.entity or "FNW-001", "Missing live sensor channels")
+        return finalize_response({
+            "intent": "SAFETY_REFUSAL_INSUFFICIENT_EVIDENCE",
+            "markdown_text": evidence_res["markdown_report"],
+            "structured_data": evidence_res["structured_data"],
+            "confidence": 0.99,
+            "needs_clarification": False,
+            "suggested_options": evidence_res["suggested_options"],
+        })
+
     # 3. Trip Event Diagnosis
     if route.intent == ESPIntentEnum.EVENT_DIAGNOSE:
         ev_id = route.entity if (route.entity and route.entity.startswith("EV-")) else None
         target_well = route.entity if (route.entity and not route.entity.startswith("EV-")) else (well_id or "FNW-001")
+
+        # Domain 12.1: False-Premise Refusal (Never diagnose a non-event on a nominal running well)
+        if not ev_id and target_well:
+            is_running, snapshot = check_well_is_running_nominally(target_well)
+            if is_running:
+                fp_res = get_false_premise_refusal_report(target_well, snapshot)
+                return finalize_response({
+                    "intent": "SAFETY_REFUSAL_FALSE_PREMISE",
+                    "markdown_text": fp_res["markdown_report"],
+                    "structured_data": fp_res["structured_data"],
+                    "confidence": 0.99,
+                    "needs_clarification": False,
+                    "suggested_options": fp_res["suggested_options"],
+                })
+
+        # Domain 12.2: Insufficient Evidence Check via Data Readiness Gate
+        if target_well and not ev_id:
+            is_ready, gate_reason = check_well_telemetry_readiness(target_well)
+            if not is_ready:
+                dr_res = get_data_readiness_refusal_report(target_well, gate_reason)
+                return finalize_response({
+                    "intent": "SAFETY_REFUSAL_INSUFFICIENT_EVIDENCE",
+                    "markdown_text": dr_res["markdown_report"],
+                    "structured_data": dr_res["structured_data"],
+                    "confidence": 0.99,
+                    "needs_clarification": False,
+                    "suggested_options": dr_res["suggested_options"],
+                })
+
         diag_res = diagnose_esp_event(DiagnoseEventRequest(event_id=ev_id, well_id=target_well))
 
         # Record execution snapshot in session
@@ -656,6 +728,10 @@ def ask_agent(
             f"- **Well Identifier**: `{target_well}`\n"
             f"- **Associated Event**: `{ev_id}`\n"
             f"- **Diagnosed Root Cause**: `{p_fault}`\n\n"
+            f"### 🛡️ Human Approval Gating (Phase 6 Write Path)\n"
+            f"- **Gated Action**: Physical Dispatch & LOTO Execution\n"
+            f"- **Approval State**: 🟡 `STAGED_PENDING_APPROVAL` (Zero autonomous field write)\n"
+            f"- **Required Sign-Off**: Petroleum Production Engineer & Electrical Maintenance Supervisor\n\n"
             f"### ⚠️ Mandatory Lockout/Tagout (LOTO) Safety Protocol\n"
             + "\n".join([f"- {item}" for item in loto_checklist]) + "\n\n"
             f"### Acceptance & Sign-off Criteria\n"
@@ -677,6 +753,11 @@ def ask_agent(
                 "event_id": ev_id,
                 "diagnosed_fault": p_fault,
                 "loto_checklist": loto_checklist,
+                "approval_status": "STAGED_PENDING_APPROVAL",
+                "requires_human_signoff": True,
+                "authorized_roles": ["PETROLEUM_PRODUCTION_ENGINEER", "ELECTRICAL_MAINTENANCE_SUPERVISOR"],
+                "action_type": "PHYSICAL_FIELD_DISPATCH",
+                "is_advisory_only": True,
             },
             "confidence": 0.99,
             "needs_clarification": False,

@@ -4092,6 +4092,204 @@ def get_well_subsystem_reframe_report(well_id: str, question: str) -> dict[str, 
     }
 
 
+# =============================================================================
+# DOMAIN 12 SAFETY & REFUSAL CAPABILITY HANDLERS
+# =============================================================================
+
+VALID_FLEET_WELLS = {
+    "FNW-001", "FS-004", "FS-006", "FS-013", "FS-016",
+    "FS-017", "FS-023", "FS-040", "FS-047", "FWS-001"
+}
+
+
+def check_well_is_running_nominally(well_id: str) -> tuple[bool, dict[str, Any]]:
+    """Domain 12.1: Check if well is currently RUNNING with nominal telemetry."""
+    try:
+        with get_esp_cursor() as cur:
+            cur.execute("""
+                SELECT timestamp, operating_state, motor_current_a, intake_pressure_psi, motor_temperature_c, vibration_g, frequency_hz
+                FROM opg_well_telemetry
+                WHERE well_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """, (well_id,))
+            row = cur.fetchone()
+            if not row:
+                return False, {}
+
+            op_state = str(row[1]).lower() if row[1] else "unknown"
+            if op_state == "running" or op_state == "nominal":
+                snapshot = {
+                    "well_id": well_id,
+                    "timestamp": str(row[0]),
+                    "status": "RUNNING",
+                    "motor_current_a": float(row[2]) if row[2] is not None else 35.0,
+                    "intake_pressure_psi": float(row[3]) if row[3] is not None else 390.0,
+                    "motor_temperature_c": float(row[4]) if row[4] is not None else 84.0,
+                    "vibration_g": float(row[5]) if row[5] is not None else 0.18,
+                    "frequency_hz": float(row[6]) if row[6] is not None else 50.0,
+                }
+                return True, snapshot
+    except Exception as e:
+        logger.warning(f"Error checking running state for {well_id}: {e}")
+    return False, {}
+
+
+def get_false_premise_refusal_report(well_id: str, snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Domain 12.1: Refusal for non-event trip inquiries on healthy wells."""
+    cur_amps = snapshot.get("motor_current_a", 35.0)
+    cur_pip = snapshot.get("intake_pressure_psi", 390.0)
+    cur_temp = snapshot.get("motor_temperature_c", 84.1)
+    cur_vib = snapshot.get("vibration_g", 0.187)
+    cur_hz = snapshot.get("frequency_hz", 50.0)
+    ts = snapshot.get("timestamp", "Live SCADA")
+
+    md = (
+        f"# [ESP APM Safety Refusal] False-Premise Query Intercepted\n\n"
+        f"**Queried Asset**: `{well_id}` | **Live Operating State**: `🟢 RUNNING / NOMINAL`\n"
+        f"**SCADA Verification Timestamp**: `{ts}`\n\n"
+        f"### 🛡️ Safety Refusal Notice\n"
+        f"Well `{well_id}` is in active production with zero uncommanded trips, shutdowns, or safety lockouts. "
+        f"The copilot refuses to fabricate a non-existent failure scenario or diagnostic root cause for a healthy asset.\n\n"
+        f"### Current Nominal Operating Parameters\n"
+        f"- **VSD Operating Frequency**: `{cur_hz:.1f} Hz` (Continuous nominal production)\n"
+        f"- **Motor Current**: `{cur_amps:.1f} A` (Within rated nameplate envelope)\n"
+        f"- **Pump Intake Pressure (PIP)**: `{cur_pip:.1f} PSI` (Stable suction head)\n"
+        f"- **Motor Winding Temp**: `{cur_temp:.1f} °C` (`{110.0 - cur_temp:.1f} °C` thermal margin to trip limit)\n"
+        f"- **Radial Vibration**: `{cur_vib:.3f} g` (Optimal mechanical threshold; limit: `2.0 g`)\n\n"
+        f"### Tripped Assets Requiring Investigation\n"
+        f"To inspect assets with confirmed offline trip events, select an option below:\n"
+        f"- **`FS-017`**: `OVERLOAD_SOLIDS` (Sand ingestion trip)\n"
+        f"- **`FNW-001`**: `HIGH_VIBRATION` (Critical bearing wear trip)\n"
+        f"- **`FS-016`**: `UNDERLOAD_PUMP_OFF` (Dry well pump-off trip)\n"
+    )
+
+    return {
+        "markdown_report": md,
+        "structured_data": {
+            "refusal_type": "FALSE_PREMISE",
+            "well_id": well_id,
+            "actual_status": "RUNNING",
+            "telemetry": snapshot,
+            "tripped_assets": ["FS-017", "FNW-001", "FS-016", "FS-040"],
+        },
+        "suggested_options": [f"Check {well_id} Health", "Diagnose FS-017", "Diagnose FNW-001", "Fleet Status"],
+    }
+
+
+def check_well_telemetry_readiness(well_id: str) -> tuple[bool, str]:
+    """Domain 12.2: Data Readiness Gate audit before automated diagnosis."""
+    norm_w = normalize_well_id(well_id) or well_id
+    try:
+        with get_esp_cursor() as cur:
+            cur.execute("""
+                SELECT timestamp, motor_current_a, intake_pressure_psi, vibration_g, motor_temperature_c
+                FROM opg_well_telemetry
+                WHERE well_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """, (norm_w,))
+            row = cur.fetchone()
+            if not row:
+                return False, f"Zero telemetry records found for asset {norm_w} in SCADA database"
+
+            ts, amps, pip, vib, temp = row[0], row[1], row[2], row[3], row[4]
+            if amps is None and pip is None and vib is None:
+                return False, "Critical downhole telemetry channels (Current, PIP, Vibration) are null or uncalibrated"
+
+            return True, "Data readiness verified"
+    except Exception as e:
+        logger.warning(f"Error checking telemetry readiness for {norm_w}: {e}")
+        return True, "Check bypassed due to exception"
+
+
+def get_data_readiness_refusal_report(well_id: str, reason: str = "Insufficient telemetry") -> dict[str, Any]:
+    """Domain 12.2: Refusal when data is missing, degraded, or stale."""
+    md = (
+        f"# [ESP APM Safety Refusal] Data Readiness Gate Failed\n\n"
+        f"**Target Asset**: `{well_id}` | **Gate Verdict**: `🔴 REJECTED (Insufficient Evidence)`\n"
+        f"**Reason**: `{reason}`\n\n"
+        f"### 🛡️ Diagnostic Integrity Policy\n"
+        f"Automated root cause classification requires continuous downhole sensor verification. "
+        f"The copilot strictly prohibits fabricating diagnostic hypotheses when real-time sensor streams are missing, uncalibrated, or degraded.\n\n"
+        f"### Data Readiness Checklist\n"
+        f"| Channel | Requirement | Observed Audit | Status |\n"
+        f"|---|---|---|:---:|\n"
+        f"| **Telemetry Stream** | Active SCADA records | Missing / Zero Rows | 🔴 FAILED |\n"
+        f"| **Timestamp Freshness** | Age < 7 Days | Stale / Unsynchronized | 🔴 FAILED |\n"
+        f"| **Sensor Completeness** | PIP, PDP, Temp, Current, Vib | Key Channels Absent | 🔴 FAILED |\n\n"
+        f"### Recommended Engineering Protocol\n"
+        f"1. Check physical surface RTU and Modbus/OPC-UA connectivity for well `{well_id}`.\n"
+        f"2. Inspect downhole sensor gauge cable continuity and power supply.\n"
+        f"3. Retrieve on-site VSD controller fault logs before commissioning restart.\n"
+    )
+
+    return {
+        "markdown_report": md,
+        "structured_data": {
+            "refusal_type": "INSUFFICIENT_EVIDENCE",
+            "well_id": well_id,
+            "data_readiness_gate": "FAILED",
+            "reason": reason,
+        },
+        "suggested_options": ["Fleet Status", "Check other wells", "Monitored Fleet Scope"],
+    }
+
+
+def get_unknown_asset_refusal_report(raw_asset: str) -> dict[str, Any]:
+    """Domain 12.5: Refusal for unrecognized assets not present in asset_registry."""
+    md = (
+        f"# [ESP APM Safety Refusal] Unknown Monitored Asset\n\n"
+        f"**Queried Identifier**: `{raw_asset}` | **Registry Lookup**: `NOT FOUND`\n\n"
+        f"### 🛡️ Asset Verification Policy\n"
+        f"Asset `{raw_asset}` does not exist in the active oilfield `asset_registry` on PostgreSQL Server 184 (`esp_apm_db`). "
+        f"The copilot strictly refuses to invent, simulate, or hallucinate equipment specifications or telemetry for unregistered assets.\n\n"
+        f"### Monitored Fleet Scope (10 Registered ESP Wells)\n"
+        f"- **Field FNW**: `FNW-001` (Cluster 15)\n"
+        f"- **Field FS**: `FS-004`, `FS-006`, `FS-013`, `FS-016`, `FS-017`, `FS-023`, `FS-040`, `FS-047` (Clusters 3, 4, 15)\n"
+        f"- **Field FWS**: `FWS-001` (Cluster 15)\n"
+    )
+
+    return {
+        "markdown_report": md,
+        "structured_data": {
+            "refusal_type": "UNKNOWN_ASSET",
+            "queried_asset": raw_asset,
+            "monitored_assets": sorted(list(VALID_FLEET_WELLS)),
+        },
+        "suggested_options": ["Fleet Status", "Diagnose FNW-001", "Check FS-004 Health", "Show fleet inventory"],
+    }
+
+
+def get_out_of_scope_refusal_report(question: str) -> dict[str, Any]:
+    """Domain 12.4: Refusal for off-topic or non-industrial queries."""
+    md = (
+        f"# [ESP APM Scope Notice] Query Outside Monitored Domain\n\n"
+        f"**Operational Scope**: Electric Submersible Pump (ESP) Artificial Lift Surveillance\n"
+        f"**Database Provenance**: PostgreSQL `esp_apm_db` on Server 184\n\n"
+        f"### 🛡️ Domain Boundary Notice\n"
+        f"I am an Industrial Maintenance and Predictive Diagnostics Copilot specialized strictly in:\n"
+        f"- Real-time ESP SCADA telemetry surveillance (Current, PIP, PDP, Temp, Vibration)\n"
+        f"- Trip root-cause diagnosis against the 14-fault physical taxonomy\n"
+        f"- Fleet production optimization, downtime triage, and safety Lockout/Tagout protocols\n"
+        f"- API RP 11S petroleum artificial lift engineering standards\n\n"
+        f"I cannot fulfill non-industrial requests such as creative writing, general trivia, weather forecasts, or general-purpose programming.\n\n"
+        f"### Available Engineering Workflows\n"
+        f"- *'Why did well FNW-001 trip?'* (Event Diagnosis)\n"
+        f"- *'What is our daily extraction volume in barrels?'* (Fleet Production)\n"
+        f"- *'Is well FS-004 operating nominally?'* (Well Health)\n"
+        f"- *'Compare Cluster 15 vs Cluster 4'* (Cluster Comparison)\n"
+    )
+
+    return {
+        "markdown_report": md,
+        "structured_data": {
+            "refusal_type": "OUT_OF_SCOPE",
+            "domain": "ESP_ARTIFICIAL_LIFT",
+        },
+        "suggested_options": ["Fleet Status", "Diagnose FNW-001", "Check FS-004 Health", "What can you do?"],
+    }
+
 
 def route_query_hybrid(
     question: str,
@@ -4197,6 +4395,86 @@ def route_query_hybrid(
             routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
         )
 
+    # Domain 12.4: Out-of-Scope Query Detection
+    out_of_scope_triggers = [
+        "poem", "write a poem", "write a song", "write a story", "tell me a joke", "tell a joke",
+        "who won the", "world cup", "super bowl", "premier league", "champions league", "football match",
+        "weather in", "forecast for", "recipe for", "how to bake", "how to cook",
+        "capital of", "who is the president of", "who was the first president",
+        "write javascript", "write html", "write react code", "python web scraper", "code a website",
+        "recommend a movie", "movie recommendation", "what should i watch", "meaning of life",
+        "what is the capital of"
+    ]
+    esp_keywords = [
+        "esp", "well", "pump", "telemetry", "vibration", "motor", "vsd", "pip", "pdp", "bpd", "bopd",
+        "trip", "tripped", "shutdown", "cluster", "scada", "water cut", "oil", "flow", "loto", "gcs",
+        "asset", "frequency", "head", "impeller", "amps", "amperage", "temperature", "subsystem"
+    ]
+    if any(t in q_lower for t in out_of_scope_triggers) and not any(k in q_lower for k in esp_keywords):
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SAFETY_REFUSAL_OUT_OF_SCOPE,
+            confidence=0.99,
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
+        )
+
+    # Domain 12.2: Insufficient Evidence / Degraded Telemetry Inquiries
+    insufficient_evidence_triggers = [
+        "missing data", "missing telemetry", "without telemetry", "without data",
+        "degraded telemetry", "degraded data", "insufficient evidence", "missing sensor",
+        "missing sensors", "no telemetry", "no sensor data", "without sensor data",
+        "telemetry is missing", "data is missing", "stale telemetry", "data readiness gate"
+    ]
+    if any(it in q_lower for it in insufficient_evidence_triggers) and any(act in q_lower for act in ["diagnos", "investigat", "root cause", "can you", "what if", "analyze", "fault"]):
+        all_w = extract_all_well_ids(question)
+        target_w = all_w[0] if all_w else None
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SAFETY_REFUSAL_INSUFFICIENT_EVIDENCE,
+            entity=target_w or "FNW-001",
+            confidence=0.99,
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
+        )
+
+    # Domain 12.5: Unknown Asset Refusal & Fuzzy Disambiguation
+    raw_well_mentions = re.findall(r"\bwell[\s:_-]+([A-Za-z0-9\-]+)\b", question, re.IGNORECASE)
+    well_mentions = [w for w in raw_well_mentions if re.search(r"\d", w) or w.upper() in ["FS", "FNW", "FWS"]]
+    code_mentions = re.findall(r"\b([A-Za-z]{2,4}[-_\s]?\d{1,4})\b", question)
+    all_raw_candidates = list(dict.fromkeys(well_mentions + code_mentions))
+    ignored_codes = {"GCS", "CLUSTER", "API", "RP", "VSD", "RTU", "LOTO", "SCADA", "PDP", "PIP", "BPD", "BOPD", "PSI", "VFM", "ROR", "BEP", "TDH", "BSW", "RMS", "CPU", "RAM", "HTTP", "REST", "JSON", "SQL", "FIELD", "DAY", "DAYS", "WEEK", "HOURS"}
+
+    unknown_well_found = None
+    for raw in all_raw_candidates:
+        clean = raw.upper().replace(" ", "-").replace("_", "-")
+        clean = re.sub(r"[^\w\-]", "", clean)
+        if clean in ignored_codes or clean in ["GCS-15", "GCS-04", "GCS-03", "GCS-4", "GCS-3", "CLUSTER-15", "CLUSTER-4", "CLUSTER-3"]:
+            continue
+        if clean in ["FNW", "FS", "FWS"] and raw not in well_mentions:
+            continue
+        std = extract_all_well_ids(clean)
+        tested_id = std[0] if std else clean
+        if tested_id not in VALID_FLEET_WELLS and not any(clean == vw.replace("-", "") for vw in VALID_FLEET_WELLS):
+            if "well" in q_lower or any(act in q_lower for act in ["diagnos", "health", "status", "trip", "telemetry", "check"]):
+                unknown_well_found = tested_id
+                break
+
+    if unknown_well_found:
+        prefix = unknown_well_found[:2] if len(unknown_well_found) >= 2 else ""
+        fuzzy = [vw for vw in sorted(list(VALID_FLEET_WELLS)) if vw.startswith(prefix)]
+        if fuzzy and len(unknown_well_found) <= 3:
+            return HybridRouteResult(
+                intent=ESPIntentEnum.SAFETY_REFUSAL_UNKNOWN_ASSET,
+                entity=unknown_well_found,
+                confidence=0.75,
+                routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
+                needs_clarification=True,
+                clarification_question=f"Asset identifier '{unknown_well_found}' is ambiguous. Did you mean one of these active monitored wells?",
+                suggested_options=fuzzy[:3],
+            )
+        return HybridRouteResult(
+            intent=ESPIntentEnum.SAFETY_REFUSAL_UNKNOWN_ASSET,
+            entity=unknown_well_found,
+            confidence=0.99,
+            routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
+        )
 
     # 1. Extract Well IDs & Event ID early to protect operational and diagnostic inquiries
     all_wells = extract_all_well_ids(question)

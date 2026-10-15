@@ -282,6 +282,24 @@ INTENT_ANCHORS: dict[ESPIntentEnum, list[str]] = {
         "what is the recommended operating range ror for esp",
         "difference between electrical leakage and phase imbalance",
     ],
+    ESPIntentEnum.SAFETY_REFUSAL_OUT_OF_SCOPE: [
+        "write a poem about dogs",
+        "who won the world cup",
+        "what is the weather in paris today",
+        "write a python script for my web scraper",
+        "tell me a funny joke",
+        "what is the capital of australia",
+        "help me write an essay on history",
+        "recipe for chocolate chip cookies",
+        "who was the first president",
+        "recommend a good movie to watch",
+    ],
+    ESPIntentEnum.SAFETY_REFUSAL_UNKNOWN_ASSET: [
+        "diagnose well xyz-999",
+        "check health for non-existent well",
+        "what happened to well 9999",
+        "telemetry for unknown asset",
+    ],
 }
 
 
