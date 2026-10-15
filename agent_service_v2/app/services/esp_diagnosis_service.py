@@ -4438,9 +4438,9 @@ def route_query_hybrid(
     # Domain 12.5: Unknown Asset Refusal & Fuzzy Disambiguation
     raw_well_mentions = re.findall(r"\bwell[\s:_-]+([A-Za-z0-9\-]+)\b", question, re.IGNORECASE)
     well_mentions = [w for w in raw_well_mentions if re.search(r"\d", w) or w.upper() in ["FS", "FNW", "FWS"]]
-    code_mentions = re.findall(r"\b([A-Za-z]{2,4}[-_\s]?\d{1,4})\b", question)
+    code_mentions = re.findall(r"\b([A-Za-z]{2,4}[-_]?\d{1,4})\b", question)
     all_raw_candidates = list(dict.fromkeys(well_mentions + code_mentions))
-    ignored_codes = {"GCS", "CLUSTER", "API", "RP", "VSD", "RTU", "LOTO", "SCADA", "PDP", "PIP", "BPD", "BOPD", "PSI", "VFM", "ROR", "BEP", "TDH", "BSW", "RMS", "CPU", "RAM", "HTTP", "REST", "JSON", "SQL", "FIELD", "DAY", "DAYS", "WEEK", "HOURS"}
+    ignored_codes = {"GCS", "CLUSTER", "API", "RP", "VSD", "RTU", "LOTO", "SCADA", "PDP", "PIP", "BPD", "BOPD", "PSI", "VFM", "ROR", "BEP", "TDH", "BSW", "RMS", "CPU", "RAM", "HTTP", "REST", "JSON", "SQL", "FIELD", "DAY", "DAYS", "WEEK", "HOURS", "PAST", "LAST", "NEXT", "OVER", "TOP", "RANK", "STEP", "RULE", "PAGE", "TEST"}
 
     unknown_well_found = None
     for raw in all_raw_candidates:
@@ -4617,8 +4617,9 @@ def route_query_hybrid(
         "virtual flow metering", "vfm", "affinity laws", "zero fabrication",
         "data readiness gate", "recommended operating range", "ror", "operating envelope"
     ]
-    is_ui_query = any(k in q_lower for k in ui_nav_keywords)
-    if is_ui_query or ("what is" in q_lower and any(w in q_lower for w in ["page", "screen", "route", "workspace", "status", "cockpit", "monitor", "calculations", "simulator", "reports", "visualizer", "equalizer", "curve", "vfm"])):
+    is_concept_query = any(q_lower.startswith(p) for p in ["what is", "what causes", "how do you mitigate", "how does", "explain"]) and not any(w in q_lower for w in ["page", "screen", "route", "workspace", "ui", "view", "menu", "navigate", "where", "take me", "how to get", "how do i navigate"])
+    is_ui_query = any(k in q_lower for k in ui_nav_keywords) and not is_concept_query
+    if is_ui_query or ("what is" in q_lower and any(w in q_lower for w in ["page", "screen", "route", "workspace", "navigation", "menu"])):
         target_entity = all_wells[0] if all_wells else None
         matched_entry, candidates = lookup_ui_route(question, target_entity)
         if matched_entry is not None or candidates or any(w in q_lower for w in ["page", "screen", "route", "where can i find", "how do i navigate"]):
@@ -4698,7 +4699,8 @@ def route_query_hybrid(
             "compare with baseline", "operating baseline", "24h vs", "design envelope",
             "operating envelope", "drifted from design", "design model", "drifted from baseline", "envelope"
         ]
-        if any(hw in q_lower for hw in hist_comp_words):
+        is_failure_history = any(fw in q_lower for fw in ["trip", "failure", "incident", "downtime", "how many", "all trip", "record"])
+        if not is_failure_history and any(hw in q_lower for hw in hist_comp_words):
             return HybridRouteResult(
                 intent=ESPIntentEnum.HISTORICAL_COMPARE,
                 entity=single_well,
@@ -4856,8 +4858,8 @@ def route_query_hybrid(
         timeline_words = [
             "alarm timeline", "trip timeline", "alarm density", "incident clustering",
             "trip clustering", "fleet alarm", "alarm cluster", "incident timeline",
-            "sequence of trips", "trip sequence", "history of trips", "trips over",
-            "trip chronology"
+            "sequence of trips", "sequence of alarms", "alarms and trips", "trip sequence",
+            "history of trips", "trips over", "trip chronology", "timeline"
         ]
         if any(w in q_lower for w in timeline_words):
             return HybridRouteResult(
@@ -4958,7 +4960,7 @@ def route_query_hybrid(
                 routing_tier=RoutingTierEnum.TIER_0_REGEX.value,
             )
         # 2. Active Trip / Shutdown Event Diagnosis
-        if any(w in q_lower for w in ["trip", "diagnos", "shutdown", "shutdwn", "what happened", "why did it stop", "why did it shut", "why did it trip", "failure event", "fault event", "root cause", "failure signature", "failure mode"]):
+        if any(w in q_lower for w in ["trip", "diagnos", "shutdown", "shutdwn", "what happened", "why did it stop", "why did it shut", "why did it trip", "failure event", "fault event", "root cause", "failure signature", "failure mode"]) or ("why did" in q_lower and "stop" in q_lower):
             return HybridRouteResult(
                 intent=ESPIntentEnum.EVENT_DIAGNOSE,
                 entity=event_id or norm_well,

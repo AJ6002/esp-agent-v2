@@ -16,7 +16,7 @@ from psycopg2.extensions import cursor as PgCursor
 
 from app.core.config import settings
 
-logger = logging.getLogger("app.esp_db")
+logger = logging.getLogger("agent.esp_db")
 
 _pool: pool.ThreadedConnectionPool | None = None
 
@@ -29,7 +29,7 @@ def get_esp_pool() -> pool.ThreadedConnectionPool:
             minconn=1,
             maxconn=10,
             dsn=settings.ESP_APM_DB_URL,
-            connect_timeout=5,
+            connect_timeout=10,
         )
     return _pool
 

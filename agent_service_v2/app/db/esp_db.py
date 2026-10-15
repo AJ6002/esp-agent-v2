@@ -29,7 +29,7 @@ def get_esp_pool() -> pool.ThreadedConnectionPool:
             minconn=1,
             maxconn=10,
             dsn=settings.ESP_APM_DB_URL,
-            connect_timeout=5,
+            connect_timeout=10,
         )
     return _pool
 
