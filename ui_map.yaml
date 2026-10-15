@@ -1,0 +1,1553 @@
+version: 1.0.0
+generated_at: '2026-10-14T10:54:48.093609+00:00'
+source: X:/TAS/v2_ESP/route-specification-docs/
+entries:
+- route_id: navigation.operations_workspace
+  type: navigation
+  title: Operations Workspace Navigation Index
+  summary: Operational command center for surveillance engineers, production technologists, and control room operators monitoring
+    the 10 active Farha South ESP assets.
+  related:
+  - route.fleet_cockpit
+  - route.working_status
+  - route.well_detail
+  - route.live_calculations
+  - route.event_intelligence
+  - route.reports_hub
+  - route.scenario_simulator
+  aliases:
+  - operations workspace
+  - operations index
+  - operations menu
+  - ops workspace
+  - operations overview
+  keywords:
+  - operations
+  - workspace
+  - navigation
+  - farha south
+  - gathering centers
+  - telemetry architecture
+  - scada
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Operations Workspace Route Specification Index
+
+    **Application:** ADVAIT ESP-PMM (Asset Performance Monitoring & Management)  
+    **Workspace:** `Operations` (`WORKSPACES.operations`)  
+    **Target Architecture:** Multi-Tier SCADA Telemetry, Thermodynamic VFM, ML Fault Spectrum & Event Forensics  
+    **Documentation Root:** [`x:\TAS\v2_ESP\route-specification-docs\`](file:///x:/TAS/v2_ESP/route-specification-docs)  
+
+    ***
+
+    ## 1. Operations Workspace Overview
+
+    The **Operations Workspace** is the real-time operational command center of the ADVAIT ESP-PMM platform. It is engineered for surveillance engineers, production technologists, and control room operators monitoring the 10 active electrical submersible pump (ESP) digital twin assets across Gathering Centers `GCS-03`, `GCS-04`, and `GCS-15` in Block 3 / Block 4.
+
+    ### Operations Navigation Hierarchy (`AppShell.tsx:55-61`)
+
+    | Order | Route Path | Navigation Label | Core Functional Focus | Specification Document |
+    |:---:|---|---|---|---|
+    | **01** | `/` | **Fleet Cockpit** | Centralized fleet surveillance, KPI cards, multi-discipline FleetTable, top-10 attention queue. | [`01_route_root_cockpit.md`](file:///x:/TAS/v2_ESP/route-specification-docs/01_route_root_cockpit.md) |
+    | **02** | `/working-status` | **Well Working Status** | Live ML 14-fault classifier spectrum, deterministic SCADA envelopes, physics checks, master-detail queue. | [`02_route_working_status.md`](file:///x:/TAS/v2_ESP/route-specification-docs/02_route_working_status.md) |
+    | **03** | `/wells/$wellId` | **Well Monitor (Detail)** | Single-well surveillance: 2D ESP string visualizer, live H-Q curve, 4-subsystem equalizer, 2D depth pressure profile. | [`03_route_wells_detail.md`](file:///x:/TAS/v2_ESP/route-specification-docs/03_route_wells_detail.md) |
+    | **04** | `/live-calculations` | **Live Calculations** | 10-well real-time derived parameters, Virtual Flow Metering (VFM), higher-order physics & fleet formula editor. | [`04_route_live_calculations.md`](file:///x:/TAS/v2_ESP/route-specification-docs/04_route_live_calculations.md) |
+    | **05** | `/events` & `/events/$eventId` | **Event Intelligence & Forensics** | Event timeline, active incident lifecycle with live second-counters, trip forensics workspace & SOP actions. | [`05_route_event_intelligence.md`](file:///x:/TAS/v2_ESP/route-specification-docs/05_route_event_intelligence.md) |
+    | **06** | `/reports` | **Reports Hub** | Governed operational reporting: Telemetry Log Reports, Well Performance deep-dive audits, Advait Excel/CSV engine. | [`06_route_reports_hub.md`](file:///x:/TAS/v2_ESP/route-specification-docs/06_route_reports_hub.md) |
+    | **07** | `/custom-testing` | **Scenario Simulator** | What-if operational scenario simulation, multi-parameter physics sliders, fault injection, and pump curve response. | [`07_route_scenario_simulator.md`](file:///x:/TAS/v2_ESP/route-specification-docs/07_route_scenario_simulator.md) |
+
+    ***
+
+    ## 2. Shared Data Architecture & Protocols Across Operations
+
+    ```mermaid
+    flowchart TD
+        subgraph Edge_and_Backend["Edge Telemetry & FastAPI Backend (:8000)"]
+            MQTT["OPC-UA / MQTT Broker (1883)<br/>esp/v1/+/telemetry"]
+            PG["PostgreSQL (5433: esp_apm_db)<br/>opg_well_telemetry & esp_unified_assessments"]
+            FASTAPI["FastAPI App (cced_esp/backend/main.py)"]
+        end
+
+        subgraph Streaming_Protocols["Live Ingestion Protocols"]
+            WS["WebSocket: /api/esp/telemetry/ws<br/>(1.0s Sub-Second Packets)"]
+            REST["REST API Endpoints<br/>(/api/esp/working-status, /live-calculations, /incidents)"]
+        end
+
+        subgraph Frontend_State["Client State & Domain Hooks"]
+            HOOK1["useEspFleet() (Canonical Fleet State)"]
+            HOOK2["useFleetFormulae() (Governed Formula Registry)"]
+            BUFFER["Live Packet Buffer & Freshness Gate (10s/30s/60s)"]
+        end
+
+        subgraph Operations_Views["Operations Workspace Screens"]
+            V1["01: Fleet Cockpit (/)"]
+            V2["02: Working Status (/working-status)"]
+            V3["03: Well Monitor (/wells/$wellId)"]
+            V4["04: Live Calculations (/live-calculations)"]
+            V5["05: Events & Incidents (/events)"]
+            V6["06: Reports Hub (/reports)"]
+            V7["07: Scenario Simulator (/custom-testing)"]
+        end
+
+        MQTT --> FASTAPI
+        PG <--> FASTAPI
+        FASTAPI --> WS
+        FASTAPI --> REST
+        WS --> BUFFER
+        REST --> HOOK1
+        BUFFER --> HOOK1
+        HOOK1 --> V1 & V2 & V3 & V4 & V5 & V6 & V7
+        HOOK2 --> V4
+    ```
+
+    ### Core Design Principles
+    1. **Zero Fabrication Policy (Rule 1 & Rule 2):** Missing or disconnected data is explicitly flagged with `STALE`, `NO_DATA`, or `UNREACHABLE` badges. The system never injects synthetic numbers to mask a dead server.
+    2. **Decoupled Telemetry vs. Inferred Assessments:** Raw physical sensor readings (Freq, Amps, Volts, PIP, PDP, Temp, Vib) update at **1.0 Hz** via WebSockets without waiting for 10-second ML model inferences, eliminating UI lag and chart flickering.
+    3. **Identity Normalization:** Unified `normalizeWellId()` ensures legacy well string variants (`FS-04`, `FS-004`, `ASSET-FS-004`) resolve to identical digital twin representations across all routes.
+- route_id: route.event_intelligence
+  type: route
+  title: Event & Incident Intelligence Forensics
+  path: /events
+  workspace: operations
+  summary: Unified SCADA incident lifecycle surveillance with live duration counters, chronological raw event audit logs,
+    and a dedicated 7-pillar trip forensics workspace.
+  related:
+  - route.fleet_cockpit
+  - route.working_status
+  - route.reports_hub
+  aliases:
+  - event intelligence
+  - events page
+  - incident lifecycle
+  - trip forensics
+  - event forensics
+  - alarm events
+  keywords:
+  - event intelligence
+  - incidents
+  - trip forensics
+  - sop verification
+  - raw audit stream
+  - 7-pillar forensics
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/events` & `/events/$eventId` — Event Intelligence & Trip Forensics
+
+    **Application Workspace:** Operations (`WORKSPACES.operations`)  
+    **File Locations:**  
+    * Index Route: [`src/routes/events.index.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/events.index.tsx)  
+    * Detail Dynamic Route: [`src/routes/events.$eventId.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/events.$eventId.tsx)  
+    * Primary Forensics Component: [`src/components/esp/troubleshooting/EventInvestigationWorkspace.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/troubleshooting/EventInvestigationWorkspace.tsx)  
+    * Live Rollup Component: [`src/components/esp/troubleshooting/LiveStateStrip.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/troubleshooting/LiveStateStrip.tsx)  
+    * Hooks & APIs: [`src/hooks/useEspFleet.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/hooks/useEspFleet.ts), [`src/services/espApi.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/services/espApi.ts)  
+    * Backend Endpoints: `GET /api/v1/incidents`, `POST /api/v1/incidents/{incident_id}/resolve`, `GET /api/v1/events`, `POST /api/v1/investigations/from-event/{event_id}`, `PATCH /api/v1/investigations/{record_id}`  
+
+    ***
+
+    ## 1. Route Metadata & Header Architecture
+
+    ### Route Definitions
+    * **Index Path:** `/events` or `/events/`
+      * **Page Title:** `Event & Incident Intelligence — Real-Time Alarm, Trip & Lifecycle Surveillance | ADVAIT ESP-PMM`
+      * **Meta Description:** `Fleet-wide and single-well ESP event intelligence, live incident lifecycle tracking with active duration counters, trip forensics, and standard operating procedures.`
+    * **Detail Path:** `/events/$eventId`
+      * **Page Title:** `Event Forensics {eventId} — ADVAIT ESP-PMM`
+      * **Meta Description:** `Forensic investigation and 7-pillar analysis record for ESP event {eventId}`
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `Event & Incident Intelligence`
+    * **Description:** `Unified SCADA Incident Lifecycle & Event Intelligence — Deduplicated active incident tracking with live duration, automated trip forensics, and standard operating procedures.`
+    * **Meta Indicators:**
+      1. **Active Incidents Pill (`StatusPill`):** Displays `{activeCount} Active Incident(s)`. Color is `critical` (pulsing red) if active incidents exist, or `normal` (emerald) when all wells are clear.
+      2. **Data SSoT Pill:** `PostgreSQL SSoT Active` indicating direct synchronization with relational incident tables.
+      3. **Fleet Asset Count Pill:** `{wells.length} Farha South Assets`.
+
+    ***
+
+    ## 2. Component 1: Scope Selection & Asset Targeting
+
+    Positioned directly below the header in an elevated toolbar panel (`rounded border border-border bg-panel p-2.5`):
+    * **Scope Toggle Buttons:**
+      * **`● Fleet Level` (`scope === "fleet"`, default):** Aggregates incident lifecycles and SCADA transitions across all 10 Farha South ESP assets.
+      * **`○ Single Well` (`scope === "single"`):** Filters the entire screen down to a specific target well.
+    * **Asset Selector Dropdown:**
+      * Smoothly fades in (`animate-in fade-in duration-200`) when `Single Well` is active.
+      * Lists all Farha South wells extracted from `useEspFleet()` (`FS-004`, `FS-006`, `FS-013`, `FS-016`, `FS-017`, `FS-023`, `FS-040`, `FS-047`, `FNW-001`, `FWS-001`).
+      * Selection immediately updates the downstream queries for both incidents and raw audit events.
+
+    ***
+
+    ## 3. Component 2: Live State Strip (`LiveStateStrip`)
+
+    Mounted prominently above the filter bar, consuming the WebSocket stream and fleet state:
+    * **Operating State Distribution:**
+      * Count of wells currently **RUNNING** (`tone="normal"`).
+      * Count of wells currently **STOPPED** or in planned shut-in (`tone="muted"`).
+      * Count of wells currently **TRIPPED** (`tone="critical"`).
+    * **Live Telemetry Connection Heartbeat:**
+      * Displays active MQTT / WebSocket connectivity status to the edge broker.
+      * Formatted UTC timestamp of the latest received telemetry packet.
+    * **Active SCADA Alarms Rollup:**
+      * Surfaces high-priority drive alarms (e.g., Underload, Overcurrent, High PIP Drawdown, High Vibration).
+
+    ***
+
+    ## 4. Component 3: Filter & Mode Navigation Control Bar
+
+    A unified filter toolbar allowing dual-view switching and multi-dimensional querying:
+    * **Primary View Switcher:**
+      * **`Incident Lifecycle ({filteredIncidents.length})`:** Features a `Flame` icon and red badge counter. Displays deduplicated incident records tracking open downtime from inception to resolution.
+      * **`Raw Audit Log ({filteredEvents.length})`:** Features a `Database` icon. Displays raw per-second/per-packet SCADA state changes and snapshot captures.
+    * **Full-Text Search Input:**
+      * Text filter with `Search` icon matching Well ID, Trip Cause, Scenario / Fault name, and active alarm tags.
+    * **Manual Refresh Action:**
+      * Button with spinning `RefreshCw` icon triggering concurrent `fetchIncidentsData()` and `fetchEvents()`.
+    * **Secondary Filter Controls:**
+      * **Time Range Selector:** Pills for `1h`, `6h`, `24h` (default), `7d`, and `30d`, calculating milliseconds cutoff `TIME_RANGE_MS[timeRange]`.
+      * **Incident Status Filter (Visible in Incidents Mode):** Dropdown for `All`, `Active Only`, and `Resolved Only`.
+      * **Severity Filter:** Dropdown for `All`, `Critical`, `Warning`, and `Normal`.
+      * **Event Type Filter:** Dropdown for `All`, `Trip`, `Alarm`, and `State Change`.
+
+    ***
+
+    ## 5. Component 4: SCADA Incident Lifecycle Table (SSoT View)
+
+    When `viewMode === "incidents"`, this table displays deduplicated records from PostgreSQL `/api/v1/incidents`:
+
+    | Column Header | Data Field | Display Format & UX Logic |
+    |---|---|---|
+    | **Status** | `inc.status` | `🔴 ACTIVE` (`StatusPill tone="critical"`) or `✅ RESOLVED` (`StatusPill tone="normal"`). |
+    | **Well ID** | `inc.well_id` | Monospace bold asset tag (hidden if filtered to Single Well mode). |
+    | **Operating State** | `inc.operating_state` | Status pill: `RUNNING` (emerald), `STOPPED` (zinc), or `TRIPPED` (red). |
+    | **Fault / Scenario** | `inc.scenario` | Human-readable fault designation (e.g. `Dry Well / Pump-Off Underload`, `Gas Locking`, `Sand Ingestion`, or `Nominal Steady-State`). |
+    | **Trip Cause** | `inc.trip_cause` | Monospace red bold trip code directly latch-reported by the VFD (e.g., `UNDERLOAD_PUMP_OFF`, `OVERLOAD_TRIP`). |
+    | **Active Alarms** | `inc.alarms` | Array of warning badges (`rounded bg-warning/20 text-warning text-[9.5px]`). |
+    | **Open Since (UTC)**| `inc.started_at` | Formatted UTC timestamp (`YYYY-MM-DD HH:MM:SS`). |
+    | **Elapsed / Total Duration** | `inc.started_at` & `inc.duration_seconds` | **`LiveIncidentDuration` Component:**<br>• For **ACTIVE** incidents: Live client-side seconds ticker with an animated pulsing radar dot (`animate-ping bg-critical`) displaying real-time accumulated downtime (`Xh Ym Zs`).<br>• For **RESOLVED** incidents: Static total duration in muted monospace. |
+    | **Actions** | Action Buttons | • **`Forensic →` (`Link to /events/$eventId`):** Deep-links to the full 7-pillar investigation using `inc.opening_event_id`.<br>• **`Close ✓` (`button`):** One-click manual incident resolution calling `resolveIncident(incidentId, "Manual operator resolution via UI")`. |
+
+    ***
+
+    ## 6. Component 5: Raw Event Audit Stream Table (Chronological Log)
+
+    When `viewMode === "raw_events"`, this table displays the granular packet audit log from `/api/v1/events`:
+
+    | Column Header | Data Field | Display Format & UX Logic |
+    |---|---|---|
+    | **Timestamp (UTC)** | `ev.timestamp` | Exact per-second UTC timestamp from OPC-UA historian. |
+    | **Well ID** | `ev.well_id` | Monospace asset tag. |
+    | **Operating State** | `ev.operating_state` | Status pill reflecting instantaneous drive state. |
+    | **Scenario / Fault** | `ev.scenario` | Edge classification tag at packet capture moment. |
+    | **Trip Cause** | `ev.trip_cause` | VFD latch code or `—` if running nominal. |
+    | **Active Alarms** | `ev.alarms` | Badges listing drive alert flags. |
+    | **Snapshot Forensic**| `ev.snapshot_status` | Status pill indicating high-resolution pre/post buffer state:<br>• `CAPTURED` (`tone="normal"`): Full $T_{-300s}$ to $T_{+60s}$ buffer preserved.<br>• `PARTIAL` (`tone="warning"`): Incomplete buffer window.<br>• `PRE-CAPTURED` (`tone="info"`): Buffer captured prior to full trip cycle.<br>• `PENDING` (`tone="muted"`): Processing snapshot. |
+    | **Actions** | Deep Link | Clickable row or `Inspect →` button routing to `/events/$eventId`. |
+
+    ***
+
+    ## 7. Component 6: Dedicated 7-Pillar Forensics Workspace (`/events/$eventId`)
+
+    Mounted on `/events/$eventId` via [`EventInvestigationWorkspace.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/troubleshooting/EventInvestigationWorkspace.tsx). Features optimistic locking (`version`), actor tracking, and an unauthenticated notice:
+
+    ### Investigation Header & Control Toolbar
+    * **Target Identifiers:** Monospace Well ID, Trip Code, Event ID, and UTC timestamp.
+    * **Epistemic Status Badge:** `DETECTED` (amber), `SUSPECTED` (blue), or `CONFIRMED` (emerald).
+    * **Record Version & Freeze Indicator:**
+      * `v{version}` tag ensuring safe concurrent editing without overwrite conflicts.
+      * `🔒 Frozen` badge (when resolved and locked) or `🔓 Active Draft` badge.
+    * **Markdown Export Button:** `Export Report` button executing `exportInvestigationMarkdown()` to generate an auditable Markdown dossier.
+    * **Optimistic Locking Conflict Banner:** Renders automatically with a `Refresh Latest State` action if another operator has committed edits concurrently.
+
+    ***
+
+    ### The 7 Analytical Investigation Pillars
+
+    ```mermaid
+    flowchart TD
+        E[ESP Trip / Alarm Event: T₀] --> P1[Pillar 1: Production Impact KPIs]
+        E --> P2[Pillar 2: Chronology of Event Sequence]
+        E --> P3[Pillar 3: Physical Evidence & Telemetry]
+        E --> P4[Pillar 4: Machine Learning Diagnostics]
+        E --> P5[Pillar 5: Engineering Hypotheses]
+        E --> P6[Pillar 6: SOP Verification Checklist]
+        E --> P7[Pillar 7: Record Audit Trail]
+        P6 --> F[Epistemic Promotion: DETECTED → SUSPECTED → CONFIRMED & FROZEN]
+    ```
+
+    #### Pillar 1: Production Impact & Financial Loss KPIs
+    * **Gross Production Deficit Rate:** BPD gross rate lost during outage with Net Oil sub-metric (`summary.flowLossGrossBpd` and `flowLossNetOilBopd`).
+    * **Daily Revenue Lost:** Calculated at $\$75/\text{bbl}$ benchmark: $\text{Daily Loss} = \text{BOPD} \times \$75$.
+    * **Downtime Duration:** Live ticking clock (`Xh Ym Zs`) running until the incident is frozen.
+    * **Cumulative Downtime Loss:** Real-time financial meter: $\text{Loss} = \left(\frac{\text{elapsed seconds}}{86400}\right) \times \text{Daily Revenue Impact}$.
+
+    #### Pillar 2: Chronology of Event Sequence
+    * **Timeline Rail:** Relative timestamps from $T_{-300s}$ through $T_0$ (Trip Moment) to $T_{+60s}$.
+    * **Node Types:**
+      * Blue nodes ($T < 0$): Pre-trip precursors, warnings, and frequency ramps.
+      * Critical Red node ($T = 0$): Exact moment VFD latched shutdown.
+      * Grey nodes ($T > 0$): Post-trip deceleration, pressure recovery, and SCADA alerts.
+    * **Data Fields:** Relative seconds, source system (`SCADA`, `VFD`, `PHYSICS_ENGINE`), operational phase, and detailed description.
+
+    #### Pillar 3: Physical Evidence & Telemetry Excursions
+    * **Threshold Excursion Badges:** Highlights sensor breaches (e.g. `PIP Excursion: Measured 65 PSI, Limit 150 PSI`).
+    * **Event-Moment Sensor Grid (6 Parameters):**
+      * Frequency (`Hz`), Motor Current (`A`), Intake Pressure (`PIP PSI`), Discharge Pressure (`PDP PSI`), Motor Temperature (`°C`), Vibration (`g`).
+    * **Synchronized High-Resolution Trend Chart:**
+      * Interactive multi-parameter Recharts line plot across the trip window displaying Current (Amps), Vibration (g), and Frequency (Hz) over time.
+
+    #### Pillar 4: Machine Learning Diagnostics (Pre-Trip Reality)
+    * **Pre-Trip Detected Fault:** Primary classification produced by the ML model prior to the physical trip.
+    * **Anomaly Score & Lookback Window:** Quantitative statistical distance from nominal and evaluation timing before trip.
+    * **8-Class Probability Spectrum:**
+      * Horizontal visual probability bars for the 8 trained classes: Bearing Degradation, Blocked Intake, Dry-Well Pump Off, Motor Overload, Normal, Phase Imbalance, Sand Ingestion, Undervoltage.
+    * **Non-Modelled Notice:** Explicitly lists catalog faults not trained in the active model version (e.g., Gas Lock, Broken Shaft, High Backpressure).
+    * **SHAP Telemetry Feature Drivers:** Tags indicating parameters that drove the anomaly prediction, stamped with `RISK_UP` (red) or `RISK_DOWN` (green).
+
+    #### Pillar 5: Multi-Source Engineering Hypotheses
+    * **Leading Hypothesis Card:** Displays primary engineering hypothesis, catalog reference, supporting physical evidence, and contradictory evidence.
+    * **Alternative Hypothesis Card:** Secondary differential diagnosis to prevent confirmation bias.
+    * **Investigation Copilot Provision Slot:** Dedicated placeholder badge (`AWAITING AGENT TEAM`) designed for autonomous multi-agent root-cause reasoning.
+
+    #### Pillar 6: Standard Operating Procedure (SOP) Verification
+    * **Acting Engineer Selector:** Self-reported operator field with explicit disclaimer: `*Notice: Backend operates in unauthenticated mode; actor identities are self-reported.`
+    * **Interactive Checklist:** Step-by-step verification steps (e.g., Step 1: Verify surface electrical supply; Step 2: Confirm check valve integrity). Checking a step automatically stamps the operator signature and timestamp.
+    * **Confirmed Root Cause Formulation:** Free-text engineering entry required before locking the record.
+    * **Lifecycle State Promotions:**
+      * `Promote to SUSPECTED` button.
+      * `Confirm & Freeze Record` button (locks version, stamps `resolvedAt`, and freezes downtime cost).
+
+    #### Pillar 7: Record Audit Trail
+    * Monospace audit log displaying timestamp, acting user, action taken (`RECORD_CREATED`, `CHECKLIST_STEP_VERIFIED`, `ROOT_CAUSE_UPDATED`, `RECORD_FROZEN`), and mutation details.
+- route_id: route.fleet_cockpit
+  type: route
+  title: ESP Fleet Cockpit
+  path: /
+  workspace: operations
+  summary: Centralized fleet-wide surveillance cockpit providing real-time KPI metrics, multi-discipline asset table views,
+    and a top-10 attention queue.
+  related:
+  - route.working_status
+  - route.well_detail
+  - route.live_calculations
+  aliases:
+  - fleet cockpit
+  - cockpit
+  - fleet monitor
+  - home page
+  - root route
+  - fleet overview
+  keywords:
+  - fleet cockpit
+  - fleet surveillance
+  - kpi cards
+  - fleet table
+  - attention queue
+  - run life
+  - deferment
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/` — ESP Fleet Cockpit
+    **Application Workspace:** ESP Insight Suite (Advait ESP-PMM)  
+    **File Location:** [`src/routes/index.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/index.tsx)  
+    **Sub-Components:** [`src/components/esp/FleetTable.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/FleetTable.tsx), [`src/components/esp/EspWellVisual.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/EspWellVisual.tsx), [`src/components/esp/ui.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/ui.tsx)  
+    **Core Data Hook:** [`src/hooks/useEspFleet.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/hooks/useEspFleet.ts)  
+
+    ***
+
+    ## 1. Route Metadata & Header
+
+    ### Route Definition
+    * **Route Path:** `/` (Index / Root Landing Page)
+    * **Page Title:** `ESP Fleet Cockpit — ADVAIT ESP-PMM`
+    * **OpenGraph / Meta Description:**
+      > *"Centralised ESP fleet surveillance: health index, availability, production deferment, and ranked attention queue across live field assets."*
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `ESP Fleet Cockpit`
+    * **Purpose:** The primary operational control room and tactical entry point for electrical submersible pump (ESP) operations across CCED Block 3 / Block 4 fields.
+    * **Integrity / System Alert Banners:**
+      1. **Backend Unreachable Alert (Critical):** Renders when `hasNoData && isError`. Alerts operators that no data has been received from FastAPI (`:8000`) and displays zero fabricated placeholders.
+      2. **Data Stale / Dropout Warning (Warning):** Renders when `s.staleCount > 0 || s.noDataCount > 0`. Shows the exact count of wells whose telemetry timestamp exceeds `LIVE_HOLD_S` thresholds (e.g. `2 of 10 wells not reporting live data: 2 stale (last known values shown)`).
+
+    ***
+
+    ## 2. Component 1: Top KPI Strip (`KpiStrip`)
+
+    Located immediately beneath the page header. Displays **6 fleet-wide operational composite metrics** aggregated across all reporting assets in real time:
+
+    | # | KPI Label | Display Value | Unit | Subtitle / Context | Tone / Color Coding | Engineering Calculation & Data Source |
+    |---|---|---|---|---|---|---|
+    | **1** | **Wells running** | `${s.running}/${s.total}` | — | `${s.down} down` | `normal` (Emerald) | `running` count = wells with $\text{Hz} > 0$ and state $\neq$ `vsd-trip` / `stopped-unplanned`. `total` = active fleet count (10 wells). |
+    | **2** | **Availability** | `s.availability` | `%` | `Run status weighted, 24 h` | Default | Availability percentage calculated over a rolling 24-hour run window: $\frac{\text{Active Uptime Hours}}{\text{Total Available Fleet Hours}} \times 100$. |
+    | **3** | **Fleet ESP health index** | `s.health` | `/100` | `Weighted envelope + thermal + degradation` | `watch` (Amber) | Composite fleet average health index derived from physics envelope compliance, motor winding temperature headroom, vibration severity, and ML degradation scores. |
+    | **4** | **Oil rate** | `n0(s.oil)` | `bopd` | `Allocated, latest scan` | Default | Total allocated net oil rate: $\sum \text{oilRateBopd}$ across all producing wells formatted with thousand separators. |
+    | **5** | **Production deferment** | `n0(s.deferred)` | `bopd` | `Vs expected from active cases` | `warning` (Orange) | Net deferred production: $\sum (\text{Target Potential Rate} - \text{Actual Produced Rate})$ for restricted, tripped, or throttled wells. |
+    | **6** | **Deferred value at risk** | `usd(s.valueUsdDay)` | `/day` | `Offline & choked capacity` | `warning` (Orange) | Monetized daily financial revenue loss: $\text{Total Deferred BOPD} \times \text{Current Realized Oil Price USD/bbl}$. |
+
+    ***
+
+    ## 3. Component 2: Fleet Monitor (`FleetTable`)
+
+    A full-width surveillance grid providing comprehensive fleet visibility across multiple operational disciplines.
+
+    ### A. Controls & Filter Bar
+    Above the table, operators have interactive filters and sub-view controls:
+    1. **Search Input (`q`):** Real-time text filter matching well ID (`FS-004`), gathering station (`GCS-03`), or pump model family (`TE2700`).
+    2. **Station Dropdown (`station`):** `All stations`, `GCS-3`, `GCS-4`, `GCS-15`.
+    3. **Field Dropdown (`field`):** `All fields`, `Farha South [FS]`, `Farha North West [FNW]`, `Farha West South [FWS]`.
+    4. **State Filter Dropdown (`stateFilter`):**
+       * `All states`
+       * `Normal` (State is normal, $\text{health} \ge 70$, $\text{Hz} > 0$)
+       * `Tripped / Stopped` ($\text{Hz} = 0$, VSD trip, planned/unplanned stop)
+       * `Anomalies / Degraded` (Running with active fault or $\text{health} < 70$)
+    5. **Sub-View Switcher (`subView` Tabs):** Four specialized domain views:
+       * **`Operations`** *(Default)*
+       * **`Production & VFM`**
+       * **`Equipment & Run Life`**
+       * **`OPC Telemetry`**
+    6. **Fleet Count Indicator:** Displays filtered well count (e.g. `10 wells`).
+
+    ***
+
+    ### B. Sub-View 1: `Operations` (Tactical Control Room View)
+    Focuses on current operating stability, operating envelopes, and anomalies:
+
+    | Column Header | Field Key | Width (px) | Sortable | Description & Logic |
+    |---|---|---|:---:|---|
+    | **Well** | `id` | 130 | Yes | Well identifier (`FS-004`) with running status glyph (`EspStatusGlyph`: Green pulsing = Running, Red = Tripped, Amber = Anomaly) and `ProvenanceBadge` (LIVE, STALE, CACHE). Clicking opens `/wells/$wellId`. |
+    | **Station / Cluster** | `station` | 160 | Yes | Gathering station badge (`GCS-03`, `GCS-04`, `GCS-15`) and field block code (`Farha South [FS]`). |
+    | **Operating State** | `state` | 130 | Yes | Status badge: `Normal`, `Outside ROR — low flow`, `Gas interference`, `Pump wear`, `Motor overload`, `VSD trip`, `Stopped — unplanned`. |
+    | **ROR Envelope** | `envelope` | 120 | Yes | Recommended Operating Range status: `Inside ROR` (Green), `Downthrust` (Amber, $Q < \text{ROR}_{\min} \times \frac{f}{f_0}$), `Upthrust` (Amber, $Q > \text{ROR}_{\max} \times \frac{f}{f_0}$), `Off / Zero Flow` (Red). |
+    | **Health** | `health` | 80 | Yes | Numerical Health Index (`0–100/100`) color-banded: Green ($\ge 75$), Amber ($50–74$), Red ($< 50$). |
+    | **Diagnosis / Anomaly** | `diagnosis` | 160 | No | Headline engineering verdict or classified fault mode (e.g. `Downthrust Exposure (Choked Choke / Low Inflow)` or `Nominal Steady-State`). |
+    | **Deferment** | `deferment` | 100 | Yes | Lost production in BOPD (e.g. `+140 BOPD` in Red if restricted, `0 BOPD` if operating at potential). |
+
+    ***
+
+    ### C. Sub-View 2: `Production & VFM` (Virtual Flow Metering)
+    Focuses on reservoir delivery, fluid cuts, and pump flow rates:
+
+    | Column Header | Field Key | Description & Engineering Logic |
+    |---|---|---|
+    | **Well** | `id` | Well identifier link with live status glyph. |
+    | **Station / Cluster** | `station` | Gathering station assignment (`GCS-03`, `GCS-04`, `GCS-15`). |
+    | **Gross Liquid** | `liquid` | Total fluid rate in `BPD` (Barrels per day) estimated via Virtual Flow Meter or surface test separator. |
+    | **Net Oil** | `oil` | Allocated net dry crude production rate in `BOPD`. |
+    | **Water Cut** | `waterCut` | Produced water percentage (`0.0% – 100.0%`). High water cut increases fluid density and motor load. |
+    | **BEP %** | `bep` | Best Efficiency Point percentage: $\frac{Q_{\text{actual}}}{\text{BEP}_{\text{rated}} \times (f / 60)} \times 100$. Shows Green if within $\pm 10\%$ of BEP ($90\%–110\%$), Amber if off-design. |
+    | **Deferment** | `deferment` | Production loss versus design baseline (`BOPD`). |
+
+    ***
+
+    ### D. Sub-View 3: `Equipment & Run Life` (Asset Reliability)
+    Focuses on hardware specifications and mechanical aging:
+
+    | Column Header | Field Key | Description & Engineering Logic |
+    |---|---|---|
+    | **Well** | `id` | Well identifier link. |
+    | **Station / Cluster** | `station` | Gathering station assignment. |
+    | **Pump Model** | `pumpModel` | Downhole centrifugal pump family/model (e.g. `TE2700`, `P-100`, `B-400`). |
+    | **Stages** | `stages` | Total number of installed pump stages (impellers + diffusers, e.g. `110 stg`, `180 stg`). |
+    | **Motor HP** | `motorHp` | Nameplate electrical motor power rating in `HP` (e.g. `120 HP`, `240 HP`). |
+    | **VSD Model** | `vsdModel` | Surface Variable Speed Drive converter specification (e.g. `VFD-480V`, `ACS880`). |
+    | **Days on Run** | `runLife` | Continuous days since downhole commissioning (`runLifeDays`). Flagged Amber if $> 1{,}000\text{ days}$. |
+    | **Install Date** | `installDate` | Historical downhole completion/workover installation date (`YYYY-MM-DD`). |
+
+    ***
+
+    ### E. Sub-View 4: `OPC Telemetry` (Raw SCADA Multi-Channel Stream)
+    Wide-table high-density view displaying **14 physical telemetry sensors** ingested from edge SCADA/OPC-UA:
+
+    | Sensor Header | Column Key | Engineering Unit | Safe Thresholds & Nominal Range |
+    |---|---|:---:|---|
+    | **Freq (Hz)** | `freq` | `Hz` | VFD operating speed ($30.0–65.0\text{ Hz}$). $0.0\text{ Hz}$ when stopped. |
+    | **Amps (A)** | `amps` | `A` | Motor drive 3-phase current draw. |
+    | **Volts (V)** | `volts` | `V` | Downhole motor terminal voltage ($380–480\text{ V}$). |
+    | **PIP (PSI)** | `pip` | `psi` | Pump Intake Pressure. Critical indicator of reservoir pressure and pump-off. |
+    | **PDP (PSI)** | `pdp` | `psi` | Pump Discharge Pressure. Measure of fluid column lift and wellhead delivery. |
+    | **Motor Temp (°C)** | `motorTemp` | `°C` | Downhole motor winding temperature. Flagged Critical if $> 120^\circ\text{C}$. |
+    | **Intake Temp (°C)** | `intakeTemp` | `°C` | Downhole fluid intake temperature. |
+    | **Vibration (g)** | `vibration` | `g` | Mechanical acceleration/vibration. Flagged Critical if $> 1.2\text{ g}$. |
+    | **WHP (PSI)** | `whp` | `psi` | Wellhead Tubing Pressure. |
+    | **FLP (PSI)** | `flp` | `psi` | Flowline Pressure downstream of the choke. |
+    | **Annulus (PSI)** | `annulus` | `psi` | Casing-tubing annulus gas pressure. |
+    | **Leak Cur (ct)** | `leak` | `ct` | Cable electrical insulation leakage count / ground fault sensor. |
+    | **DHG Cur (mA)** | `dhg` | `mA` | Downhole gauge telemetry loop current ($4–20\text{ mA}$). |
+    | **STD_VFD_STS** | `vfdSts` | binary | VFD run status contact ($1 = \text{Run}$, $0 = \text{Stop}$). |
+
+    *Note: In `OPC Telemetry` mode, the **Well ID** column is pinned (`sticky left-0`), and all column headers support custom drag-resizing with settings saved directly to browser `localStorage`.*
+
+    ***
+
+    ## 4. Component 3: Monitoring Focus (`Operational Surveillance Queue`)
+
+    Located below the Fleet Monitor. An automated exception ranking engine sorting problematic wells.
+
+    * **Section Header Action:** `Open Working Status →` (navigates to `/working-status`).
+    * **Sorting Rule:** Ranked primarily by **Severity** (`critical` $\rightarrow$ `warning` $\rightarrow$ `watch`), then secondary-ranked by **Production Impact (BOPD)**.
+    * **Max Rows Displayed:** Top 10 critical operational exceptions (`needsAttention.slice(0, 10)`).
+
+    ### Table Columns
+    1. **Severity:** Status pill displaying `critical` (Red), `warning` (Orange), or `watch` (Amber).
+    2. **Well:** Clickable link navigating directly to [`/wells/$wellId`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/wells.$wellId.tsx).
+    3. **ML Status (Healthy / Anomaly):** Automated AI diagnosis badge (`Anomaly (Outside ROR)`, `Anomaly (Gas Locking)`, `Anomaly (Motor Overload)`).
+    4. **Operating Regime / Fault Mode:** Specific diagnosed physical condition or root-cause category.
+    5. **Impact bopd:** Quantity of oil deferred or threatened by this specific condition.
+    6. **Age:** Elapsed duration since the exception condition was first triggered (formatted via `hoursToDuration(durationH)`, e.g. `4h 15m`).
+    7. **Conf.:** AI/ML classification statistical confidence percentage (e.g. `94%`, `99%`).
+
+    ***
+
+    ## 5. Component 4: Open States, Alerts and Alarms Category List
+
+    Located at the bottom of the cockpit. Renders a distribution grid visualizing how the active fleet is partitioned across operating states and fault modes.
+
+    * **Grid Layout:** Responsive cards (`sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`).
+    * **Visual Progress Bars:** Scaled relative to the category with the highest well count (`(count / maxCategoryCount) * 100%`).
+    * **Category Color Coding:**
+      * **Healthy / Normal States:** Emerald green circle + bar (`bg-emerald-500`).
+      * **Trip / Overload / Power Loss:** Red circle + bar (`bg-red-500`).
+      * **Anomalies / Outside ROR / Warnings:** Amber circle + bar (`bg-amber-500`).
+    * **Count Badge:** Exact asset count (e.g. `6 wells`, `2 wells`, `1 well`).
+
+    ***
+
+    ## 6. Data Source & Network Architecture for `/`
+
+    ```mermaid
+    graph TD
+        subgraph Data_Layer["Backend & Live Feeds"]
+            API1["GET /api/esp/assets<br/>(Fleet Master Records)"]
+            API2["GET /api/health<br/>(System & Backend Health)"]
+            API3["GET /api/esp/profitability<br/>(Financial & Deferment Baselines)"]
+            WS["WebSocket: /api/esp/telemetry/ws<br/>(1-Second Live SCADA Packets)"]
+        end
+
+        subgraph State_Hook["React Hook: useEspFleet()"]
+            BUFFER["Live Telemetry Buffer & Freshness Gate"]
+            CALC["Physics & ROR Calc Engine (calc.ts)"]
+            MERGE["Merge Asset Config + Telemetry + AI Assessments"]
+        end
+
+        subgraph UI_View["Root Route (index.tsx)"]
+            KPI["1. KpiStrip (6 Aggregate Metrics)"]
+            FLEET["2. FleetTable (4 Domain Sub-Views)"]
+            FOCUS["3. Monitoring Focus (Ranked Top-10 Exceptions)"]
+            CATS["4. Open States & Alarm Categories"]
+        end
+
+        API1 --> State_Hook
+        API2 --> State_Hook
+        API3 --> State_Hook
+        WS --> State_Hook
+
+        State_Hook --> UI_View
+    ```
+
+    ### Key Data Interfaces
+    * **`useEspFleet()`**: Canonical data orchestrator. Combines REST asset definitions from PostgreSQL with live MQTT/WebSocket SCADA streams.
+    * **Freshness & Provenance Engine:** Uses `LIVE_FRESH_S` (10s) and `LIVE_HOLD_S` (60s). If a well stops broadcasting MQTT packets, its status transitions from `LIVE` to `STALE`, and finally to `NO_DATA`.
+    * **Zero Fabrication Policy:** If the backend or database disconnects, the UI displays explicit alert banners rather than synthetic or random mock numbers.
+- route_id: route.live_calculations
+  type: route
+  title: Live Telemetry & Derived Physics Engine
+  path: /live-calculations
+  workspace: operations
+  summary: Real-time 1-second edge telemetry calculation bench, Virtual Flow Metering (VFM), higher-order physics inspection,
+    and fleet KPI formula editor.
+  related:
+  - route.fleet_cockpit
+  - route.well_detail
+  - route.scenario_simulator
+  aliases:
+  - live calculations
+  - derived physics
+  - vfm calculations
+  - fleet kpi formulas
+  - physics engine
+  - live calculations page
+  keywords:
+  - live calculations
+  - virtual flow metering
+  - vfm
+  - formula editor
+  - opc-ua inputs
+  - higher order physics
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/live-calculations` — Real-Time Telemetry & Derived Physics Engine
+    **Application Workspace:** Operations (`WORKSPACES.operations`)  
+    **File Location:** [`src/routes/live-calculations.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/live-calculations.tsx)  
+    **Supporting Component:** [`src/components/esp/FleetKpiFormulasEditor.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/FleetKpiFormulasEditor.tsx)  
+    **Hooks:** [`src/hooks/useFleetFormulae.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/hooks/useFleetFormulae.ts), [`src/hooks/useEspFleet.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/hooks/useEspFleet.ts)  
+    **Backend API:** `GET /api/esp/live-calculations`, `POST /api/esp/formulae/save-to-disk`  
+    **Streaming Protocol:** WebSocket (`LIVE_TELEMETRY` packets + VFM JSON updates)  
+
+    ***
+
+    ## 1. Route Metadata & Header
+
+    ### Route Definition
+    * **Route Path:** `/live-calculations`
+    * **Page Title:** `Live Real-Time Telemetry & Derived Physics Calculations — ADVAIT ESP-PMM`
+    * **Meta Description:** `Real-time 1-second telemetry calculations, Virtual Flow Metering (VFM), higher-order physics, and ML event tagging for all 10 active field wells.`
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `Live Calculations & Physics Engine`
+    * **Description:** `Real-time edge telemetry, virtual flow metering, and physics calculations streaming across active field assets.`
+    * **Meta Pills & System Badges:**
+      1. **Online Assets Badge (`StatusPill tone="normal"`):** Displays `{online_wells} Online / {total_wells} Fleet` with a pulsing green dot.
+      2. **Streaming Cadence Badge:** `1s OPC-UA Cadence` indicating sub-second streaming from Java Gateway.
+      3. **Flagged Event Counter:** Shows `{anomalyCount} Flagged Events` (Amber if $>0$, Muted if nominal).
+      4. **Manual Sync Action Button:** `<button onClick={fetchLiveCalculations}>` with spinning `RefreshCw` icon labeled `Sync 1s`.
+
+    ### Navigation Tabs (`activeTab`)
+    Positioned below the header:
+    * **`Well Physics & VFM`** (`single-well`, default): Deep 3-tier physics, virtual flow metering, and sensor inputs per well.
+    * **`Fleet KPI Formulas`** (`fleet-kpis`): Live interactive equation editor allowing petroleum engineers to inspect and modify mathematical expressions for fleet KPIs.
+
+    ***
+
+    ## 2. Component 1: Ribbon KPI Banner (Fleet Rollup)
+
+    Renders across the top in a 4-card responsive grid:
+
+    | # | Tile Title | Display Value | Icon | Context & Engineering Tooltip |
+    |---|---|---|:---:|---|
+    | **1** | **Online Field Assets** | `{online_wells} / {total_wells}` | `Database` | Total active production wells communicating over OPC-UA (`Mapped to Java OPC Gateway`). |
+    | **2** | **Total VFM Gross Rate** | `{totalGrossLiquid} BPD` | `Activity` | Sum of virtual flow metered gross liquid across all online assets. Stamped with `Thermodynamic Proof Engine` badge. |
+    | **3** | **Net Field Oil Output** | `{totalNetOil} BOPD` | `Flame` | Total estimated net oil production rollup based on dynamic well-test water cuts. |
+    | **4** | **Tagged Field Events** | `{anomalyCount} Anomalies` | `AlertTriangle` | Count of wells deviating from baseline or experiencing trips, powered by the 14-fault ML classifier. |
+
+    ***
+
+    ## 3. Component 2: Active Well Selector Ribbon
+
+    Horizontal pill bar allowing one-click switching across all 10 active field wells:
+    * **Asset Pills:** `FS-004`, `FS-006`, `FS-013`, `FS-016`, `FS-017`, `FS-023`, `FS-040`, `FS-047`, `FNW-001`, `FWS-001`.
+    * **Dynamic Status Dots:**
+      * **Emerald (`bg-emerald-500`):** Machine running online in nominal steady-state.
+      * **Amber (`bg-amber-400`):** Active anomaly detected by ML classifier or physics breach.
+      * **Rose (`bg-rose-500`):** VFD Trip / emergency shut-in ($0.0\text{ Hz}$).
+      * **Zinc (`bg-zinc-500`):** Offline / zero communications.
+    * **Selection State:** Active well is highlighted with primary border, background tint, and elevation shadow.
+
+    ***
+
+    ## 4. Component 3: 3-Tier Granular Well Physics Inspector
+
+    When an active well is selected, the view renders a **3-Column Grid** detailing raw sensors, thermodynamic models, and higher-order ML classifications:
+
+    ### Column 1: 14 Standard OPC-UA Inputs (`raw_inputs`)
+    * **Subtitle:** `Raw SCADA telemetry posted by Java OPC Gateway for {well_id}`
+    * **Header Action Pill:** `<StatusPill tone="muted">{vsd_status}</StatusPill>` (`RUNNING`, `TRIPPED`, `READY`).
+    * **14 Tabulated Channels:**
+      1. *Intake Pressure (PIP):* `intake_pressure_psi` (PSI)
+      2. *Discharge Pressure (PDP):* `discharge_pressure_psi` (PSI)
+      3. *Wellhead Pressure (WHP):* `whp_psi` (PSI)
+      4. *VFD Operating Frequency:* `frequency_hz` (Hz)
+      5. *Motor Current:* `motor_current_a` (A)
+      6. *Motor Voltage:* `motor_voltage_v` (V)
+      7. *Motor Winding Temp:* `motor_temperature_c` (°C)
+      8. *Vibration Level:* `vibration_g` (g)
+      9. *Surface Flow Rate:* `flow_rate_bpd` (BPD)
+      10. *Choke Valve Opening:* `choke_size_pct` (%)
+      11. *Water Cut:* `water_cut_pct` (%)
+      12. *Gas Flow Rate:* `gas_flow_mscfd` (MSCFD)
+      13. *VSD Operating Status:* String code
+      14. *Casing Annulus Pressure:* `casing_pressure_psi` (PSI)
+
+    ***
+
+    ### Column 2: Tier 2 Derived & VFM Metrics (`derived_vfm`)
+    * **Subtitle:** `Physics-based Virtual Flow Metering & Thermodynamic Balance`
+    * **Header Action Pill:** Energy balance status (`HENCE PROVED`, `VERIFIED`, `ENERGY CONSTRAINED`).
+    * **10 Solved Parameters:**
+      1. *Pump Differential ($\Delta P$):* $\text{PDP} - \text{PIP}$ (PSI).
+      2. *Total Dynamic Head (TDH):* Fluid lift generated in feet of liquid (`ft`).
+      3. *Head Per Stage:* $\frac{\text{TDH}}{\text{Stage Count}}$ (`ft/stg`).
+      4. *VFM Gross Liquid Rate:* Solved volumetric gross liquid in `BPD`.
+      5. *VFM Net Oil Rate:* Calculated oil production in `BOPD`.
+      6. *VFM Net Water Rate:* Produced brine rate in `BWPD`.
+      7. *VFM Calculated Water Cut:* Emulsion percentage (`%`).
+      8. *Energy Balance Variance:* First law thermodynamic power error percentage (`%`).
+      9. *Hydraulic Shaft Work:* Mechanical energy absorbed by fluid ($\text{BHP}_{\text{hydraulic}}$ in HP).
+      10. *Electrical Shaft Work:* Wire-to-water motor shaft power output ($\text{BHP}_{\text{electrical}}$ in HP).
+
+    ***
+
+    ### Column 3: Tier 3 Physics & Event Classifier (`high_order_derived` + `event_tagging`)
+    * **Subtitle:** `Higher-order indicators & live ML fault classification`
+    * **Card A — Higher-Order Physics Indicators:**
+      * *Pressure Ratio (PDP/PIP):* Compression ratio across pump stages.
+      * *Hydraulic Power Output:* Total fluid work expressed in kilowatts (`kW`).
+      * *Motor Thermal Lift:* Motor temperature rise over intake fluid ($\Delta T$ in °C).
+      * *Motor Slip:* Induction rotor slip percentage (`%`).
+      * *Vibration Trend:* Mechanical stability indicator (`STABLE`, `ELEVATED`, `SPIKE`).
+    * **Card B — Tagged ML Event Classifier:**
+      * *Header Pill:* Confidence percentage (e.g. `98.4% Conf`).
+      * *Baseline State:* `NORMAL` (Green) or `ANOMALY` (Amber).
+      * *Tagged Classification:* Diagnosed fault mode (e.g. `Downthrust Exposure`, `Gas Interference & Lock`, `Underload Pump-Off`).
+      * *Severity Level:* `CRITICAL`, `WARNING`, `WATCH`, `NORMAL`.
+      * *Event Description Box:* Detailed engineering explanation of the physical deviation.
+
+    ***
+
+    ## 5. Tab 2: Fleet KPI Formulas Editor (`FleetKpiFormulasEditor`)
+
+    * **Purpose:** Provides complete transparent governance over mathematical formulas used across the platform.
+    * **Capabilities:**
+      * Allows authorized engineers to view and modify formula strings (e.g. Availability %, Fleet Deferment BOPD, Weighted Health Index).
+      * Syntax validation against standard SCADA symbol dictionaries.
+      * **Save to Disk Action:** Serializes governed formulas to `master-formulae.json` on backend disk.
+      * **Reset to Default Action:** Restores baseline CCED/OEM standard equations.
+
+    ***
+
+    ## 6. Real-Time Data Pipeline & Dual-Sync Protocol
+
+    ```mermaid
+    sequenceDiagram
+        autonumber
+        actor Engineer
+        participant UI as LiveCalculationsPage
+        participant WS as WebSocket (/telemetry/ws)
+        participant API as FastAPI REST (:8000)
+        
+        Engineer->>UI: Opens /live-calculations
+        UI->>API: GET /api/esp/live-calculations (Polls every 4s)
+        API-->>UI: Complete 10-well JSON payload (wells[])
+        
+        loop Every 1 Second
+            WS-->>UI: msg.type == "LIVE_TELEMETRY"
+            Note over UI: Surgically updates raw_inputs for matching well_id<br/>Updates VFM metrics without remounting or flickering.
+        end
+
+        Engineer->>UI: Clicks "FS-016" in Active Well Selector
+        UI->>UI: Sets selectedWell="FS-016", repaints 3-column physics inspector
+    ```
+- route_id: route.reports_hub
+  type: route
+  title: Operational Reports & Governance Hub
+  path: /reports
+  workspace: operations
+  summary: Governed operational reporting hub enforcing zero-fabrication data gates, custom reporting intervals, Advait-styled
+    Excel/CSV exports, and historical archive tracking.
+  related:
+  - route.fleet_cockpit
+  - route.event_intelligence
+  aliases:
+  - reports hub
+  - operational reports
+  - telemetry log report
+  - well performance report
+  - report builder
+  - reports page
+  keywords:
+  - reports hub
+  - telemetry reports
+  - zero fabrication
+  - data readiness
+  - excel export
+  - report archive
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/reports` — Operational Reports & Governance Hub
+
+    **Application Workspace:** Operations (`WORKSPACES.operations`)  
+    **File Location:** [`src/routes/reports.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/reports.tsx)  
+    **Supporting Components:**  
+    * [`ReportBuilder.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/reports/ReportBuilder.tsx)  
+    * [`ReportPreview.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/reports/ReportPreview.tsx)  
+    * [`InsufficientDataView.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/reports/InsufficientDataView.tsx)  
+    * [`ReportArchive.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/reports/ReportArchive.tsx)  
+    **Governance & Engine Modules:** [`src/lib/esp/historian.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/lib/esp/historian.ts), [`src/data/esp/reports.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/data/esp/reports.ts)  
+    **Database Provenance:** PostgreSQL SCADA Historian Replica (`postgresql://esp_apm_db`)  
+
+    ***
+
+    ## 1. Route Metadata & Governance Rules
+
+    ### Route Definition
+    * **Route Path:** `/reports`
+    * **Page Title:** `Operational Reports & Governance Hub — ADVAIT ESP-PMM`
+    * **Meta Description:** `Zero-fabrication operational reporting: Telemetry & Operations Log Report, Well Performance deep-dive, and audited export workflows.`
+
+    ### Core Engineering Governance Philosophy (Zero-Fabrication)
+    The Reports Hub implements strict petroleum data governance rules to eliminate AI hallucinations and synthetic data fabrication:
+    * **Rule 1 (Data Completeness Gate):** Requires $\ge 98.0\%$ valid sensor data packets across the queried window.
+    * **Rule 2 (Zero-Fabrication Hard Stop):** If sensor telemetry is missing, corrupt, or unverified, the system refuses to generate synthetic estimates and instead routes the user to the `InsufficientDataView` explaining the gap.
+    * **Rule 3 (Sensor Integrity Flagging):** Gauge drift, missing PIP, or VFD communication interruptions are explicitly flagged in the document header and export metadata.
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `Operational Reports & Governance Hub`
+    * **Description:** `Comprehensive ESP operational reporting: Telemetry & Operations Log Reports and Well Performance diagnostic audits.`
+    * **Status Pill:** `Historian Connected (UTC)` confirming active read connection to the PostgreSQL replica.
+
+    ***
+
+    ## 2. Component 1: Report Builder & Governance Control (`ReportBuilder`)
+
+    The configuration bench allows petroleum surveillance engineers to define reporting boundaries across 6 granular controls:
+
+    ```mermaid
+    flowchart LR
+        A[Template Selection] --> B[Reporting Interval & Cadence]
+        B --> C[Asset Scope Definition]
+        C --> D[Data Readiness Validation]
+        D -- Pass --> E[Silky CSS Grid Document Expansion]
+        D -- Fail --> F[Insufficient Data Gate]
+    ```
+
+    ### Granular Form Parameters
+
+    | # | Control Name | UI Type | Options / Formats | Validation & Code Rules |
+    |---|---|---|---|---|
+    | **1** | **Report Template** | Dropdown | • `Telemetry & Operations Log Report` (`type: "log"`)<br>• `Well Performance Report` (`type: "well_performance"`) | Governed by `REPORT_CONFIGS`. Switching templates resets cadence and defaults to appropriate asset scopes. |
+    | **2** | **Reporting Period** | Dropdown + Date Range | • `Last 1 hour`<br>• `Last 6 hours`<br>• `Last 24 hours`<br>• `Last 7 days`<br>• `Custom UTC Window` | `computePeriodRange()` calculates exact ISO UTC start and end bounds (`customStartUtc`, `customEndUtc`). |
+    | **3** | **Logging Cadence** | Dropdown | • Log Report: `raw`, `1m`, `5m`, `15m`, `1h`<br>• Well Performance: `1h`, `4h`, `12h`, `1d` | **Anti-Bloat Guard:** For `well_performance`, if high-frequency cadences (`raw`, `1m`, `5m`) are selected, the system automatically sanitizes the request to `1h`. |
+    | **4** | **Asset Scope** | Radio / Dropdown | • `All Fields & Clusters` (`scope: "all"`)<br>• `Gathering Center` (`scope: "field"`: GCS-03, GCS-04, GCS-15)<br>• `Individual Well` (`scope: "well"`) | Dropdowns populate Farha South assets (`FS-004`, `FS-006`, etc.) dynamically via `useEspFleet()`. |
+    | **5** | **Generated By** | Text Input | Author signature tag (Default: `VK (Ops Engineer)`) | Stamped onto the audit header of exported reports. |
+    | **6** | **Telemetry Condition** | Mode Selector | • `NORMAL` (100% verified)<br>• `PARTIAL` (Flags gauge gap)<br>• `INSUFFICIENT` (Triggers Rule 2 gate) | Used for operational testing and audit trail verification. |
+
+    ### Generation Trigger (`handleGenerate`)
+    Clicking **`Generate Report`**:
+    1. Sanitizes cadence to prevent browser memory exhaustion.
+    2. Runs `validateDataReadiness()`.
+    3. Appends a structured audit record into `ReportArchive`.
+    4. Executes a dual `requestAnimationFrame` to trigger silky cubic-bezier CSS Grid height expansion (`0fr` $\rightarrow$ `1fr`), followed by smooth auto-scrolling to the preview container.
+
+    ***
+
+    ## 3. Component 2: Governed Report Document Preview (`ReportPreview`)
+
+    Renders a production-grade, print-ready document preview directly inside the browser:
+
+    ### Document Header & Provenance
+    * **Corporate Header:** Advait Energy Technologies branding, logo, and ISO metadata.
+    * **Document Number:** Unique stamped identifier (e.g., `REP-20261014-01`).
+    * **Security & Classification:** `CONFIDENTIAL — OMAN FIELD OPERATIONS`.
+    * **Provenance Banner:** Confirms source as `scada_historian_replica (postgresql://esp_apm_db)` with query execution timestamp in UTC.
+
+    ### Executive KPI Summary Strip
+    Calculated across the selected operational window:
+    * **Gross Production Volume:** Total liquid barrels produced (`bbl`).
+    * **Net Oil Output:** Total hydrocarbon barrels accounting for dynamic water cut (`stb`).
+    * **Cumulative Energy Consumption:** Electrical power consumed downhole (`kWh`).
+    * **Operational Uptime Ratio:** Percentage of time the VFD ran nominal without trip events (`%`).
+
+    ### Tabular Telemetry & Diagnostic Sections
+    * **For Telemetry Log Report:** Chronological table displaying Frequency (Hz), Current (A), PIP (psi), PDP (psi), Motor Temp (°C), Vibration (g), and Flow Rate (BPD) at the requested cadence.
+    * **For Well Performance Report:** Multi-zone breakdown covering Pump Efficiency, Total Dynamic Head (TDH), Operating Point vs Best Efficiency Point (BEP), and Motor Thermal Headroom.
+    * **Excursion Highlighting:** Readings breaching field warning or critical trip limits are color-coded in amber and red.
+
+    ### Export Action Bar
+    * **`Download Microsoft Excel (.xlsx)`:** Generates a multi-sheet spreadsheet with Advait corporate styling, formatted number cells, and formula metadata.
+    * **`Download CSV Log (.csv)`:** Exports raw, comma-delimited time series adhering to POSIX standards for ingest into external reservoir simulators (e.g. Eclipse, Petrel).
+    * **`Close Preview`:** Smoothly collapses the preview panel back to the builder form.
+
+    ***
+
+    ## 4. Component 3: Insufficient Data Gate (`InsufficientDataView`)
+
+    Triggered whenever telemetry fails Rule 1 or Rule 2 readiness criteria:
+
+    ### UI/UX Visual Elements
+    * **Alert Banner (`tone="critical"`):** Prominently displays `INSUFFICIENT TELEMETRY DATA — GENERATION HALTED`.
+    * **Reasoning Breakdown:** Lists exact failed telemetry checks, such as:
+      * `Downhole gauge (PIP/PDP) missing data for 45 minutes.`
+      * `Telemetry packet completeness 84.2% (minimum threshold 98.0% required).`
+      * `Edge gateway heartbeat timeout exceeded.`
+    * **Zero-Hallucination Disclaimer:** Reassures operators that Advait ESP-PMM never generates estimated or fictitious numbers in audited reports.
+    * **Remediation Action:** Provides an `Inspect Gauge Health` action and a `Retry Telemetry Validation` button.
+
+    ***
+
+    ## 5. Component 4: Report Archive Registry (`ReportArchive`)
+
+    A persistent table of historical reports generated during the surveillance session:
+
+    | Column Header | Field Name | Description |
+    |---|---|---|
+    | **Report ID** | `item.id` | Monospace identifier (e.g. `REP-20261014-01`). |
+    | **Generated Date** | `item.dateGeneratedUtc` | Exact UTC timestamp of report compilation. |
+    | **Template** | `item.reportTitle` | Report name and target well/field. |
+    | **Reporting Period** | `item.periodText` | Start and end UTC window. |
+    | **Scope** | `item.scopeText` | Fleet, cluster, or specific well identifier. |
+    | **Author** | `item.generatedBy` | Name or badge of the surveillance engineer. |
+    | **Quality Status** | `item.status` | Status pill: `Ready` (emerald), `Partial data` (amber), or `Insufficient data` (red). |
+    | **Data Quality Summary**| `item.dataQualitySummary` | One-line audit explanation of sensor verification. |
+    | **Actions** | Action Buttons | • **`Re-Run`:** Re-loads parameters into builder and recompiles.<br>• **`Delete`:** Removes entry from local session archive. |
+- route_id: route.scenario_simulator
+  type: route
+  title: What-If Scenario Simulator
+  path: /custom-testing
+  workspace: operations
+  summary: What-if operational scenario simulation bench with 14-channel telemetry controls, calibrated fault presets, dynamic
+    pump curve feedback, and thermal reliability margins.
+  related:
+  - route.well_detail
+  - route.live_calculations
+  aliases:
+  - scenario simulator
+  - what-if simulator
+  - custom testing
+  - sensor testing
+  - what if scenario simulator
+  - custom testing bench
+  keywords:
+  - scenario simulator
+  - what-if analysis
+  - fault presets
+  - dynamic pump curve
+  - 14-channel telemetry
+  - thermal stress
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/custom-testing` — What-If Scenario Simulator Bench
+
+    **Application Workspace:** Operations (`WORKSPACES.operations`)  
+    **File Location:** [`src/routes/custom-testing.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/custom-testing.tsx)  
+    **Supporting Components & Modules:**  
+    * [`PumpCurveChart.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/charts/PumpCurveChart.tsx)  
+    * [`calc.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/lib/esp/calc.ts) (`tdhBreakdown`, `frictionHeadFt`, `psiToFt`)  
+    * [`fleet.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/data/esp/fleet.ts) (`FLEET` dataset)  
+    **Backend Mathematical Provenance:** Matches `esp_routes.py` lines 572, 575, 608, 675, and 2491.  
+
+    ***
+
+    ## 1. Route Metadata & Header
+
+    ### Route Definition
+    * **Route Path:** `/custom-testing`
+    * **Page Title:** `What-If Scenario Simulator — ADVAIT ESP-PMM`
+    * **Meta Description:** `What-if operational scenario simulation and sensor testing across all platform views.`
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `What-If Scenario Simulator`
+    * **Subtitle:** `Define an operational scenario or adjust sensor telemetry to evaluate physical lift dynamics, pump operating curves, and virtual flow rates.`
+    * **Header Actions & Info:** Surfaces last execution timestamp and provides instant keyboard shortcut notice (`Enter to Simulate`).
+
+    ***
+
+    ## 2. Component 1: Scenario Configuration Bench (`Section 1`)
+
+    Encapsulated in an elevated master panel (`Panel`):
+    * **Target Well Configuration Dropdown:**
+      * Pulls asset specifications from the `FLEET` registry (`FS-004`, `FS-006`, `FS-010`, `FS-013`, `FS-016`, `FS-017`, `FS-023`, `FS-040`, `FS-047`, `FNW-001`, `FWS-001`).
+      * Changing wells automatically updates the equipment hardware defaults: Pump Depth (ft), Number of Stages, Motor HP, and Baseline Water Cut (%).
+    * **Quick Scenario Presets Dropdown:**
+      * One-click presets injecting pre-calibrated multi-parameter fault conditions:
+
+    | Preset Name | Tone | Badge | Physical Condition Description |
+    |---|:---:|---|---|
+    | **Normal Operating Baseline** | `normal` | `Optimal 50.0 Hz` | Stable production rate at BEP with minimal gas fraction, normal thermal & electrical balance. |
+    | **Gas Interference & Locking** | `warning` | `GVF 38.0%` | Free gas entering pump intake causing head reduction, current oscillation, and rate drop. |
+    | **Dry Well / Pump-Off Underload** | `critical` | `PIP 65 psi` | Fluid level drop below intake. Low intake pressure, underload current, and severe motor overheating. |
+    | **Sand Ingestion & High Load** | `warning` | `Current 66 A` | Particulate solids causing mechanical friction, motor overload current spike, and thermal rise. |
+    | **Bearing Degradation & Thermal Stress**| `critical` | `Vibration 3.4g` | Mechanical bearing wear downhole with elevated radial vibration and critical winding temperature. |
+    | **Electrical Phase Imbalance** | `warning` | `Power Factor 0.68`| Unbalanced supply voltage or surface VFD transformer phase drop causing current asymmetry. |
+
+    ***
+
+    ## 3. Component 2: 14-Channel Granular Telemetry Input Grid
+
+    Surfaces full interactive control over every primary downhole and surface measurement:
+
+    ```mermaid
+    grid-flowchart
+        subgraph Electrical_Group["Electrical Domain"]
+            C1["1. Frequency (30 - 65 Hz)"]
+            C2["4. Motor Current (10 - 100 A)"]
+            C3["5. Motor Voltage (300 - 500 V)"]
+            C4["6. Power Factor (0.40 - 1.00)"]
+        end
+        subgraph Hydraulic_Group["Hydraulic & Production Domain"]
+            C5["2. Intake Pressure PIP (0 - 1500 psi)"]
+            C6["3. Discharge Pressure PDP (500 - 3500 psi)"]
+            C7["9. Gross Liquid Rate (0 - 5000 BPD)"]
+            C8["10. Water Cut (0 - 100 %)"]
+            C9["13. Wellhead Pressure WHP (0 - 1000 psi)"]
+            C10["14. Surface Choke (0 - 100 %)"]
+        end
+        subgraph Gas_and_Mechanical["Gas & Mechanical Domain"]
+            C11["7. Motor Temp (20 - 180 °C)"]
+            C12["8. Radial Vibration (0.0 - 6.0 g)"]
+            C13["11. Gas Rate (0 - 1000 MSCFD)"]
+            C14["12. Gas Fraction GVF (0.0 - 80.0 %)"]
+        end
+    ```
+
+    ### Granular Input Specifications
+
+    | # | Channel Name | State Variable | Step | Min / Max | Engineering Unit | Visual Accent |
+    |---|---|---|:---:|:---:|:---:|:---:|
+    | **1** | Drive Frequency | `freq` | $0.5$ | $30 - 65$ | $\text{Hz}$ | Emerald |
+    | **2** | Intake Pressure (PIP) | `pip` | $10$ | $0 - 1500$ | $\text{psi}$ | Cyan |
+    | **3** | Discharge Pressure (PDP) | `pdp` | $25$ | $500 - 3500$ | $\text{psi}$ | Sky Blue |
+    | **4** | Motor Current | `current` | $0.5$ | $10 - 100$ | $\text{A}$ | Amber |
+    | **5** | Motor Voltage | `voltage` | $5$ | $300 - 500$ | $\text{V}$ | Yellow |
+    | **6** | Power Factor | `powerFactor` | $0.01$ | $0.40 - 1.00$ | $\cos\phi$ | Amber |
+    | **7** | Motor Winding Temperature | `motorTemp` | $1$ | $20 - 180$ | $\text{°C}$ | Rose |
+    | **8** | Radial Vibration | `vibration` | $0.05$ | $0.0 - 6.0$ | $\text{g}$ | Rose |
+    | **9** | Gross Liquid Rate | `flowRate` | $10$ | $0 - 5000$ | $\text{BPD}$ | Emerald |
+    | **10**| Water Cut | `waterCut` | $1$ | $0 - 100$ | $\%$ | Blue |
+    | **11**| Gas Rate | `gasFlow` | $5$ | $0 - 1000$ | $\text{MSCFD}$ | Teal |
+    | **12**| Gas Volume Fraction (GVF)| `gvf` | $0.5$ | $0.0 - 80.0$ | $\%$ | Teal |
+    | **13**| Wellhead Pressure (WHP) | `whp` | $5$ | $0 - 1000$ | $\text{psi}$ | Indigo |
+    | **14**| Surface Choke Position | `choke` | $5$ | $0 - 100$ | $\%$ | Purple |
+
+    ### Hardware Assembly Banner & Simulation Action
+    * **Downhole Specs Ribbon:** Displays active assembly parameters: `Pump: {pumpModel}`, `Stages: {stages}`, `Depth: {pumpDepth} ft`, `Motor HP: {motorHp} HP`.
+    * **Execution Button (`Simulate Scenario (Enter)`):** Triggers `handleExecute()`, re-evaluates the physics formulas, and initiates smooth scrolling to the analytical sub-pages below.
+
+    ***
+
+    ## 4. Component 3: Analytical Physics Engine & Derived Formulas
+
+    All calculations match the backend Single Source of Truth (`esp_routes.py`):
+
+    1. **Fluid Specific Gravity ($SG$):**
+       $$SG = (WC \times 1.05) + ((1 - WC) \times 0.85)$$
+    2. **Pressure Differential ($\Delta P$):**
+       $$\Delta P = PDP - PIP \quad [\text{psi}]$$
+    3. **Total Dynamic Head ($TDH$):**
+       $$TDH = H_{\Delta P} + H_{\text{elevation}} + H_{\text{friction}} \quad [\text{ft}]$$
+       *Calculated via `tdhBreakdown()` with Hazen-Williams friction.*
+    4. **Head per Stage:**
+       $$\text{Head/Stage} = \frac{TDH_{\text{total}}}{\text{stages}} \quad [\text{ft/stage}]$$
+    5. **Active Electrical Power ($P_{kW}$):**
+       $$P_{kW} = \frac{\sqrt{3} \times V \times I \times \cos\phi}{1000}$$
+    6. **Hydraulic Power ($HP_{hyd}$):**
+       $$HP_{hyd} = \frac{Q_{BPD} \times TDH_{\text{ft}} \times SG}{135,740}$$
+    7. **Motor Power Utilized ($HP_{used}$):**
+       $$HP_{used} = P_{kW} \times 1.341$$
+    8. **Wire-to-Water Overall Efficiency ($\eta$):**
+       $$\eta = \left(\frac{HP_{hyd}}{HP_{used}}\right) \times 100\%$$
+    9. **Virtual Flow Metering (VFM Liquidation):**
+       $$Q_{\text{vfm, gross}} = Q \times \left(1 - \frac{GVF}{100} \times 0.45\right)$$
+       $$Q_{\text{vfm, net oil}} = Q_{\text{vfm, gross}} \times \left(1 - \frac{WC}{100}\right)$$
+       $$Q_{\text{vfm, water}} = Q_{\text{vfm, gross}} \times \left(\frac{WC}{100}\right)$$
+    10. **Real-Time Fault Classifier & Health Score:**
+        * Evaluates deterministic rules against simulated values:
+          * $PIP < 100\text{ psi} \lor I < 30\text{ A} \rightarrow \text{Dry Well / Pump-Off Underload}$ ($P = 0.88$, Health: $32$).
+          * $GVF > 25\% \rightarrow \text{Gas Interference & Locking}$ ($P = 0.79$, Health: $48$).
+          * $\text{Vibration} > 2.5\text{g} \lor T_{\text{motor}} > 120\text{°C} \rightarrow \text{Bearing Wear & Thermal Stress}$ ($P = 0.84$, Health: $42$).
+          * $I > 60\text{ A} \rightarrow \text{Sand Ingestion / Overload}$ ($P = 0.75$, Health: $52$).
+          * $\cos\phi < 0.75 \rightarrow \text{Electrical Phase Imbalance}$ ($P = 0.68$).
+
+    ***
+
+    ## 5. Component 4: Multi-View Analytical Workspace (4 Sub-Pages)
+
+    Navigated via a dedicated pagination controller (`activeSubPage` $1 \rightarrow 4$) with next/previous buttons:
+
+    ### Sub-Page 1: Downhole & Fleet Impact
+    * **Fleet Gross Rate Delta:** Compares simulated gross liquid rate against baseline field quota.
+    * **14-Channel Telemetry Grid:** Renders cards for all 14 parameters displaying current simulated values against standard normal operating envelopes. Sensor values out of range are highlighted in amber/rose.
+
+    ### Sub-Page 2: Physics & VFM Breakdown
+    * **Fluid Dynamics Panel:** Fluid SG ($0.85 - 1.05$), Delta P ($\text{psi}$), TDH ($\text{ft}$), and Head/Stage ($\text{ft/stage}$).
+    * **Power & Efficiency Panel:** Active Electrical Power ($\text{kW}$), Hydraulic Power ($\text{HP}$), Motor Utilization ($\text{HP}$), Wire-to-Water Efficiency ($\%$), and Motor Slip ($\%$).
+    * **VFM Reconciled Production:** Reconciled Gross Liquid ($\text{BPD}$), Net Oil Output ($\text{BOPD}$), and Water Production ($\text{BWPD}$).
+    * **Evaluated Fault Spectrum:** Primary classified fault banner, health score index ($0 - 100$), and sorted probability spectrum.
+
+    ### Sub-Page 3: Dynamic Pump Curve Analysis (`PumpCurveChart`)
+    * **Interactive H-Q Affinity Curve:**
+      * Recalculates head and flow affinity equations dynamically based on simulated frequency:
+        $$Q_2 = Q_1 \left(\frac{f_2}{f_1}\right), \quad H_2 = H_1 \left(\frac{f_2}{f_1}\right)^2$$
+    * **Operating Point Overlay:** Plots an active pulsating marker $(Q_{\text{sim}}, TDH_{\text{sim}})$ on top of the catalog curve.
+    * **Operating Zones:** Visual shading for the Continuous Operating Range (COR) and Recommended Operating Range (ROR) with BEP marker.
+
+    ### Sub-Page 4: Thermal & Reliability Margins
+    * **Motor Thermal Headroom:** Calculated winding temperature margin before thermal trip ($140\text{°C}$ limit).
+    * **Vibration Fatigue Index:** Radial acceleration stress rating based on ISO 10816 vibration severity standards.
+    * **Remaining Useful Life (RUL) Delta:** Estimated runtime impact and mechanical stress degradation index.
+- route_id: route.well_detail
+  type: route
+  title: Well Monitor & Downhole Detail
+  path: /wells/$wellId
+  workspace: single-well
+  summary: Single-well surveillance console featuring 2D downhole schematic visualizer, live H-Q pump performance curve, 4-subsystem
+    equalizer, and wellbore depth pressure profile.
+  related:
+  - route.fleet_cockpit
+  - route.working_status
+  - route.live_calculations
+  aliases:
+  - well monitor
+  - well detail
+  - well view
+  - esp visualizer
+  - single well monitor
+  - pump curve view
+  keywords:
+  - well monitor
+  - pump performance curve
+  - affinity laws
+  - 2d string visualizer
+  - pressure depth profile
+  - subsystem equalizer
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/wells` & `/wells/$wellId` — ESP Well Detail & Surveillance Monitor
+    **Application Workspace:** ESP Insight Suite (Advait ESP-PMM)  
+    **File Locations:**  
+    - Index Route (Redirect): [`src/routes/wells.index.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/wells.index.tsx)  
+    - Detail Route (Monitor): [`src/routes/wells.$wellId.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/wells.$wellId.tsx)  
+    **Core Sub-Components:**  
+    - Live Pump Performance Curve: [`src/components/esp/LivePumpPerformanceCurve.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/LivePumpPerformanceCurve.tsx)  
+    - ESP 2D String Visualizer: [`src/components/esp/EspWellVisual.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/EspWellVisual.tsx)  
+    - 4-Subsystem Equalizer: [`src/components/esp/SubsystemEqualizer.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/SubsystemEqualizer.tsx)  
+    - Pressure-Depth Profile: [`src/components/esp/PressureProfile.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/PressureProfile.tsx)  
+    - Synchronized Multi-Tag Trends: [`src/components/esp/SynchronizedMultiTagTrends.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/components/esp/SynchronizedMultiTagTrends.tsx)  
+    **Core Data Hooks & APIs:** `useEspFleet()`, `fetchWellConfiguration`, `fetchHistorianWindow`, `fetchAssetForensics`, `fetchAssetVfm`, `fetchAssetEvents`  
+
+    ***
+
+    ## 1. Route Metadata & Index Behavior
+
+    ### A. The Index Route: `/wells` (`src/routes/wells.index.tsx`)
+    * **Behavior:** Pure Router Redirect (`beforeLoad`).
+    * **Implementation:**
+      ```typescript
+      export const Route = createFileRoute("/wells/")({
+        beforeLoad: () => {
+          throw redirect({ to: "/" });
+        },
+      });
+      ```
+    * **Architecture Rationale:** The root route `/` (`ESP Fleet Cockpit`) is already the canonical fleet-wide grid and surveillance table. Therefore, visiting `/wells` directly redirects to `/` to eliminate redundant table routing.
+
+    ***
+
+    ### B. The Detail Route: `/wells/$wellId` (`src/routes/wells.$wellId.tsx`)
+    * **Page Title:** `{params.wellId} Monitor — ADVAIT ESP-PMM`
+    * **OpenGraph Title:** `{params.wellId} ESP Monitor`
+    * **Meta Description:** `ESP well operating snapshot, state timeline, trends, operating point and recommendations for {params.wellId}.`
+    * **Well Identity Normalization (`normalizeWellId`):**
+      * Normalizes aliases such as `FS-04`, `FS-004`, and `ASSET-FS-004` to resolve to the same canonical digital twin well object.
+    * **Component Split Architecture:**
+      * Uses an outer wrapper `WellMonitor` that resolves the well object and guards hook execution before rendering `WellMonitorContent`, preventing hook re-ordering crashes when backend telemetry transitions from loading to ready.
+
+    ***
+
+    ## 2. Page Header & Quick Navigation Actions
+
+    Located at the very top of the well monitor.
+
+    ### A. Title & Meta Badges
+    * **Title:** `{well.id} — {fieldName} · {padName}` (e.g. `FS-004 — Farha South · Pad-04`).
+    * **Description:** Live operational headline (e.g. `Nominal Steady-State Operation` or `Underload Pump-Off Trip`).
+    * **Contextual Meta Pills:**
+      1. **Operating State Pill:** `<StatusPill tone={stateTone[well.state]}>{stateLabels[well.state]}</StatusPill>` (Normal, Outside ROR, VSD Trip, Gas Interference).
+      2. **Field Badge:** Field block name (e.g. `Farha South`).
+      3. **Pump Hardware Spec:** Pump model + stage count (e.g. `Borets 400-Series · 110 stages`).
+      4. **Telemetry Provenance Badge:**
+         * `⚡ Live SCADA Telemetry` (Pulsing green if active WebSocket packet received within 30s).
+         * `🕒 Historian Cached (DB)` (Amber if from database replica).
+         * `📐 Physics Baseline` (Blue if running on cold-start physics baseline).
+      5. **Data Quality Badge (`DataQualityBadge`):** Overall sensor QoD (`EXCELLENT`, `GOOD`, `DEGRADED`).
+      6. **Last Event Tracker:** Displays last recorded trip or fault code with elapsed time (e.g. `Last event: UNDERLOAD_PUMP_OFF (2h ago)`).
+
+    ### B. Header Actions & Cross-Workspace Links
+    * **Carousel Prev / Next Well Buttons:** `← {prev.id}` and `{next.id} →` for rapid keyboard/mouse cycling across the 10 fleet wells.
+    * **Open in Engineering Workbench:** Navigates directly to `/engineering/workbench?well={well.id}` with this well pre-loaded in the nodal physics solver.
+    * **Governed Asset Configuration:** Navigates to `/esp-configuration?wellId={well.id}&tab=sizing` to inspect OEM nameplates, cable lengths, and PVT baselines.
+
+    ***
+
+    ## 3. Component 1: Well KPI Strip (`KpiStrip` — 7 Core Metrics)
+
+    Displays the 7 mission-critical operational indicators for the individual asset:
+
+    | # | Metric Label | Display Value | Engineering Unit | Subtitle / Calculation Detail | Tone Logic | Data SSoT |
+    |---|---|---|:---:|---|---|---|
+    | **1** | **ESP health index & verdict** | `liveHealthIndex` (`0–100`) | `/100` | • If tripped: `Tripped: {reason}`<br>• If anomaly: `Anomaly: {fault} ({conf}%)`<br>• If normal: `Status: Healthy · P10–P90 In-Envelope` | Green ($\ge 75$), Amber ($60–74$), Red ($< 60$) | WebSocket `ESP_ASSESSMENT` packet > fleet well object. |
+    | **2** | **Drive frequency** | `liveHz` | `Hz` | `Calibrated P50: {designHz} Hz · VFD Active/Off` | Normal ($40–60\text{ Hz}$), Warning ($< 35$ or $> 62\text{ Hz}$), Stopped ($0\text{ Hz}$) | `STD_FREQ_HZ` |
+    | **3** | **Motor current & load** | `liveAmps` | `A` | `{liveLoadPct}% Load · 559 V` ($\text{Load} = \frac{\text{Amps}}{\text{Rating}} \times 100$) | Normal ($60–95\%$), Warning ($> 105\%$), Critical ($> 115\%$ or $< 30\%$) | `STD_AMP_A` |
+    | **4** | **Motor temperature** | `motorTempCVal` | `°C` | `ΔT: +{deltaTC}°C · Trip Limit 135°C` ($\Delta T = T_{\text{motor}} - T_{\text{intake}}$) | Normal ($< 100^\circ\text{C}$), Warning ($> 110^\circ\text{C}$), Critical ($> 125^\circ\text{C}$) | `STD_MOTOR_TEMP_C` & `STD_INT_TEMP_C` |
+    | **5** | **Intake pressure (PIP)** | `livePip` | `psi` | `Target: {designPipPsi} psi · P10–P90 Corridor` | Normal ($400–800\text{ psi}$), Warning ($< 300\text{ psi}$), Critical ($< 150\text{ psi}$) | `STD_INT_PRS_PSI` |
+    | **6** | **Discharge pressure (PDP)** | `livePdp` | `psi` | `ΔP Head Boost: +{deltaP} psi vs {baseDeltaP} psi` ($\Delta P = PDP - PIP$) | Tracks hydraulic head boost generated across pump stages | `STD_DISCH_PRS_PSI` |
+    | **7** | **Production deferment** | `liveDeferredBopd` | `bopd` | • If normal: `Steady-State Nominal · Zero Lost Oil`<br>• If tripped: `Well Shut-In · 100% Production Deferred`<br>• If restricted: `Choked Inflow · X BOPD Lost` | Red if $> 0\text{ BOPD}$, else Green | Realized rate versus design potential |
+
+    ***
+
+    ## 4. Component 2: Higher-Order Estimation · VFM Engine Ribbon
+
+    A dedicated thermodynamic proof banner driven by the **Virtual Flow Meter (VFM)** solver:
+
+    * **Header Badge (`energy_status`):**
+      * `HENCE PROVED` (Emerald green badge if Energy Balance Variance $< 10.0\%$).
+      * `ENERGY CONSTRAINED` (Amber badge if Energy Balance Variance $\ge 10.0\%$).
+    * **5 Thermodynamic Estimator Tiles:**
+      1. **Gross Liquid Rate (Estd.):** Total volumetric production in `BPD` solved via downhole hydraulic pressure drop and VFD affinity equations.
+      2. **Net Oil Rate (Estd.):** Net oil revenue stream in `BOPD` ($Q_{\text{oil}} = Q_{\text{liq}} \times (1 - \text{WC})$).
+      3. **Net Water Rate (Estd.):** Produced formation water/brine in `BWPD`.
+      4. **Water Cut (Estd.):** Percentage water cut (`%`), derived from downhole fluid gradiometer or calibrated well tests.
+      5. **Energy Balance Variance (%):** First Law of Thermodynamics convergence check comparing downhole hydraulic work against surface electrical power input:
+         $$\text{Variance \%} = \frac{|\text{Electrical Power (HP)} - \text{Hydraulic Power (HP)}|}{\text{Electrical Power (HP)}} \times 100$$
+
+    ***
+
+    ## 5. Primary Workspace Tabs
+
+    The center of the page features a 4-tab switcher:
+    `["Overview", "Trends", "Operating point", "Pressure profile"]`
+
+    ```
+    ┌────────────────────────────────────────────────────────────────────────┐
+    │ [Overview]      [Trends]      [Operating point]      [Pressure profile]│
+    └────────────────────────────────────────────────────────────────────────┘
+    ```
+
+    ***
+
+    ### Tab 1: `Overview` (Tactical Dual-Panel)
+    Renders a split grid (`lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]`):
+
+    #### A. Left Panel: ESP System Visualization (`EspWellVisual`)
+    * **Component:** 2D interactive physical wellbore string rendering.
+    * **Visual Elements:**
+      * Surface Wellhead ($WHP$).
+      * Production Tubing with fluid flow animation.
+      * Cable bands and downhole electrical cable.
+      * ESP Pump Stages, Intake Screen ($PIP$), Gas Separator, Protector/Seal Section, Downhole Electric Motor ($T_{\text{motor}}$), and Sensor Base Gauge ($DHG$).
+    * **Interactivity:** Hovering over any component marker displays live versus design engineering parameters (e.g. Pump Setting Depth, Motor HP, Cable Voltage Drop).
+
+    #### B. Right Panel: Live Pump Performance Curve (`LivePumpPerformanceCurve`)
+    * **Height:** `460px`.
+    * **Visuals:** Renders live manufacturer Head-Capacity ($H-Q$) curve, Brake Horsepower ($BHP$), Recommended Operating Range ($POR$), Best Efficiency Point ($BEP$), and the **Red Bullseye Operating Marker** showing exactly where the well is producing.
+
+    ***
+
+    ### Tab 2: `Trends` (High-Density Telemetry Historian)
+    * **Component:** `SynchronizedMultiTagTrends`
+    * **Data Source:** Combines live 10-second polling from `/api/v1/historian/{asset_id}/window` with live 1.0s WebSocket stream.
+    * **Features:**
+      * Multi-channel synchronized stacked line charts for `Frequency (Hz)`, `Motor Current (A)`, `Intake Pressure (psi)`, `Discharge Pressure (psi)`, `Motor Temp (°C)`, and `Vibration (g)`.
+      * Time-synchronized vertical crosshair cursor.
+      * SCADA alarm trip bands and threshold lines overlaid on charts.
+
+    ***
+
+    ### Tab 3: `Operating point` (Dedicated Curve Analyzer)
+    * **Component:** Full-screen dedicated `LivePumpPerformanceCurve`.
+    * **Purpose:** Allows reservoir and production engineers to perform in-depth analysis of pump affinity scaling:
+      * Adjust frequency sliders ($30–65\text{ Hz}$).
+      * Observe dynamic shifting of $BEP$ and $POR$ boundaries.
+      * Inspect downthrust / upthrust boundaries and runout cavitation limits.
+
+    ***
+
+    ### Tab 4: `Pressure profile` (Wellbore Forensics & Hydrostatic Gradient)
+    The deepest diagnostic section in the platform, divided into 3 stacked sub-components:
+
+    #### A. Top Forensic Controls & Time Scrubber Ribbon
+    * **Mode Selector:**
+      * `Live Broker` (Real-time live telemetry at 1.0s).
+      * `Historian Archive` (Inspects historical time brackets).
+    * **Time Scope Selector:** `15m`, `30m`, `1h`, `4h`, `24h`.
+    * **Interactive Timeline Scrubber Slider:**
+      * When in `Historian Archive` mode, an interactive scrub slider appears.
+      * Dragging the slider scrubs back in time through recorded historical packets, instantly re-calculating the depth profile and subsystem balance at that exact historical second (e.g. 5 minutes before an ESP trip).
+
+    #### B. Sub-Component 1: 4-Subsystem Balance Equalizer (`SubsystemEqualizer`)
+    Evaluates the physical health of the 4 critical ESP subsystems:
+    1. **Hydraulic Subsystem:** Differential pressure boost, flow stability, and ROR envelope compliance.
+    2. **Electrical Subsystem:** Current balance, terminal voltage, and VFD power factor.
+    3. **Thermal Subsystem:** Motor internal winding heat dissipation and fluid cooling velocity ($> 1\text{ ft/s}$).
+    4. **Mechanical Subsystem:** Radial/axial vibration ($g$) and thrust bearing wear.
+
+    #### C. Sub-Component 2: Wellbore Pressure Depth Profile (`PressureProfile`)
+    * **Component:** 2D hydrostatic gradient chart plotting depth ($0\text{ ft}$ to Total Depth $\sim 5{,}000\text{ ft}$) versus Pressure ($0–3{,}000\text{ psi}$).
+    * **Plotted Curve:**
+      * Shows continuous pressure gradient from Reservoir Pressure ($P_r$) $\rightarrow$ Flowing Bottomhole Pressure ($P_{\text{wf}}$) $\rightarrow$ Pump Intake ($PIP$) $\rightarrow$ Pump Discharge Stage Boost ($PDP$) $\rightarrow$ Wellhead Pressure ($WHP$).
+    * **Three Summary Footer Cards:**
+      1. **Surface Wellhead:** $WHP$ (PSI) with surface choke opening ($XX/64"$).
+      2. **Pump Stage Boost:** Measured $\Delta P$ ($PDP - PIP$) in PSI across the $N$ stages.
+      3. **Reservoir:** Static Reservoir Pressure ($P_r$) and Flowing Bottomhole Pressure ($P_{\text{wf}}$).
+
+    #### D. Sub-Component 3: Depth Node Pressures & Hydrostatic Gradient Table
+    Tabulates exact numerical node values from surface to sandface:
+    * Wellhead Pressure ($WHP$, $0\text{ ft}$)
+    * Discharge Pressure ($PDP$, at Pump Setting Depth)
+    * Intake Pressure ($PIP$, at Pump Setting Depth)
+    * Pump $\Delta P$ Head Boost
+    * Flowing Bottomhole Pressure ($P_{\text{wf}}$, at Perforations Depth)
+    * Static Reservoir Pressure ($P_r$)
+    * **Drawdown Driving Force ($P_r - P_{\text{wf}}$)**
+    * **Gradient Summary:** Fluid Specific Gravity ($SG$), Hydrostatic Gradient ($\text{psi/ft}$), Gas Void Fraction at pump intake ($GVF\%$), and Water Cut ($\%$).
+
+    ***
+
+    ## 6. Real-Time Telemetry & WebSocket Subscription Architecture
+
+    ```mermaid
+    sequenceDiagram
+        autonumber
+        actor Engineer
+        participant UI as WellMonitorContent
+        participant WS as WebSocket (/telemetry/ws)
+        participant REST as FastAPI REST Endpoints
+        participant DB as PostgreSQL 184 (esp_apm_db)
+
+        Engineer->>UI: Navigates to /wells/FS-004
+        UI->>REST: fetchWellConfiguration(FS-004)
+        UI->>REST: fetchAssetVfm(FS-004)
+        UI->>REST: fetchHistorianWindow(FS-004, range=4h)
+        UI->>REST: fetchAssetForensics(FS-004, bracket=1h)
+        
+        WS-->>UI: msg.type == "LIVE_TELEMETRY" (1s)
+        Note over UI: Updates liveHz, liveAmps, livePip, livePdp, motorTempCVal<br/>Decoupled from 10s historian to eliminate UI flicker.
+
+        WS-->>UI: msg.type == "ESP_ASSESSMENT"
+        Note over UI: Updates liveHealthIndex, liveFaultClassification, and confidence.
+
+        WS-->>UI: msg.type == "VFM_UPDATE"
+        Note over UI: Updates thermodynamic liquid/oil rates & energy variance.
+
+        Engineer->>UI: Switches to "Pressure profile" & clicks "Historian Archive"
+        Engineer->>UI: Drags Timeline Scrubber to Tick #42 (-18 mins)
+        UI->>UI: Repaints SubsystemEqualizer & PressureProfile with snapshot at Tick #42
+    ```
+
+    ### Critical Resiliency & Data Integrity Rules
+    1. **Zero Hook Reordering:** Pre-resolution wrapper prevents React hooks crashes during network lag or asset discovery.
+    2. **WebSocket Packet Expiration (30s Latch):** Raw WebSocket packets are stamped with `__receivedAt`. If the WebSocket drops for $> 30\text{ seconds}$, the UI falls back to the fleet well object with a `CACHED_DB` or `STALE` badge rather than pretending dead telemetry is live.
+    3. **Decoupled Live Telemetry:** Raw sensor tiles update directly from the 1.0s stream and do not wait for the 10-second historical downsampling query, preventing chart and KPI flickering.
+- route_id: route.working_status
+  type: route
+  title: Well Working Status & Fault Spectrum
+  path: /working-status
+  workspace: operations
+  summary: Real-time 14-fault ML classifier probability spectrum, deterministic SCADA operating envelopes, and master-detail
+    exception queue.
+  related:
+  - route.fleet_cockpit
+  - route.well_detail
+  - route.event_intelligence
+  aliases:
+  - working status
+  - working status page
+  - well working status
+  - fault queue
+  - diagnostic queue
+  - working status table
+  keywords:
+  - working status
+  - 14-fault classifier
+  - anomaly score
+  - scada rules
+  - trip cause
+  - diagnostic panel
+  authority: Advait Surveillance Engineering
+  last_reviewed: 2026-10-14
+  description: |-
+    # 🧭 Route Specification: `/working-status` — Well Working Status & Fault Spectrum
+    **Application Workspace:** ESP Insight Suite (Advait ESP-PMM)  
+    **File Location:** [`src/routes/working-status.tsx`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/working-status.tsx)  
+    **Helper Logic:** [`src/lib/workingStatusPanel.ts`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/lib/workingStatusPanel.ts)  
+    **Backend API SSoT:** [`cced_esp/backend/api/esp_routes.py`](file:///x:/TAS/v2_ESP/cced_esp/backend/api/esp_routes.py) (`GET /api/esp/working-status`)  
+    **Live Streaming Protocol:** WebSocket (`/api/esp/telemetry/ws` via `telemetryWs.ts`)  
+
+    ***
+
+    ## 1. Route Metadata & Header Controls
+
+    ### Route Definition
+    * **Route Path:** `/working-status`
+    * **Page Title:** `Well Working Status — ADVAIT ESP-PMM`
+    * **OpenGraph / Meta Description:**
+      > *"Real-time ESP well working status queue with evidence, fault probabilities, recommended actions and acknowledge / assign / close workflow."*
+    * **OpenGraph Title:** `ESP Well Working Status & Model Fault Spectrum`
+    * **OpenGraph Description:** `Live ML Model fault detection and sensor telemetry across the ESP fleet.`
+
+    ### Header Section (`PageHeader`)
+    * **Title:** `Well Working Status & Fault Spectrum`
+    * **Description:** `Real-time ML anomaly detection, 14-fault classification probabilities, and operating status.`
+    * **Header Actions (`ToggleRow`):** Segmented filter toggle with 5 view options:
+      1. **`All`**: Displays the complete fleet (10 simulator active wells).
+      2. **`Anomalies`**: Filters for tripped assets (`liveTripped`) or wells deviating from normal baseline (`!isHealthy`).
+      3. **`Healthy`**: Filters strictly for un-tripped, nominal baseline assets (`isHealthy && !liveTripped`).
+      4. **`Critical`**: Displays immediate-action assets (`severity === "critical"` or `liveTripped`).
+      5. **`Warning`**: Displays assets in watch/warning status (`severity === "warning"` and not tripped).
+
+    ***
+
+    ## 2. Component 1: Working Status KPI Strip (`KpiStrip`)
+
+    Positioned directly under the header. Computes real-time fleet diagnostic distributions:
+
+    | # | Metric Label | Display Value | Tone / Color Coding | Subtext | Data Logic |
+    |---|---|---|---|---|---|
+    | **1** | **Total Fleet Wells** | `totals.total` | `info` (Blue) | `Active SCADA stream` | Total count of registered reporting wells ($N = 10$). |
+    | **2** | **Anomalies Detected** | `totals.anomalies` | `critical` (if $> 0$) else `normal` | `Model alerts` | Count of assets where `liveTripped === true` OR `isHealthy === false`. |
+    | **3** | **Critical Faults** | `totals.critical` | `critical` (Red) | `Immediate action` | Assets with `severity === "critical"` or in tripped state. |
+    | **4** | **Warning Status** | `totals.warning` | `warning` (Amber) | `Shift inspection` | Assets with `severity === "warning"` operating with non-critical alerts. |
+    | **5** | **Healthy Operation** | `totals.healthy` | `normal` (Green) | `Normal baseline` | Assets confirmed within calibrated baseline corridors (`isHealthy && !liveTripped`). |
+
+    ***
+
+    ## 3. Component 2: Working Status Queue (`Panel` — Master Table)
+
+    Located on the left side of the split screen (`xl:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]`). Serves as the primary operational selection list.
+
+    ### Panel Header Elements
+    * **Title:** `Working Status Queue — {rows.length} wells`
+    * **Heartbeat Badge:** Pulsing emerald indicator with text `Live 1.0 Hz` signifying active WebSocket telemetry streaming.
+    * **Scroll Boundary:** Maximum height `calc(100vh - 310px)` with `.panel-scroll` bar.
+    * **Row Interaction:** Clicking any row selects that well (`setSelectedId(item.id)`), highlighting it with a primary ring/background and populating the right-hand inspection panel.
+
+    ### Table Column Definitions
+
+    | # | Column Header | Alignment | Styling | Description & Display Logic |
+    |---|---|---|---|---|
+    | **1** | **Severity** | Left | `<StatusPill>` | Severity badge: `critical` (Red), `warning` (Amber), `watch` (Yellow), `normal` (Green). |
+    | **2** | **Well ID** | Left | Monospace, Bold | Well tag (`FS-004`, `FS-016`). Displays a `ProvenanceBadge` (`STALE` or `NO_DATA` with age) if packet transmission lags. |
+    | **3** | **ML Status (Healthy / Anomaly)** | Left | `<StatusPill>` | • If tripped: `TRIPPED` (Red)<br>• If healthy: `Healthy (Normal)` (Green)<br>• If anomaly: `Anomaly ({latchedFault})` (Amber/Red). |
+    | **4** | **Category / Primary Fault** | Left | Truncated, 190px max | Diagnosed fault signature or operating mode (e.g. `Underload Pump-Off`, `Downthrust Exposure`, `Gas Interference & Lock`, or `Healthy State (Normal Operation)`). |
+    | **5** | **Freq (Hz)** | Right | Monospace, Font Bold | VSD electrical output frequency. Rendered in **Red** if stopped ($0.0\text{ Hz}$), else **Cyan** (`50.0`, `54.5`). |
+    | **6** | **Inp (PSI)** | Right | Monospace | Intake Pressure (PIP) in PSI. |
+    | **7** | **Disch (PSI)** | Right | Monospace | Discharge Pressure (PDP) in PSI. |
+    | **8** | **Amps (A)** | Right | Monospace | Motor drive current in Amperes. |
+    | **9** | **Confidence** | Right | Monospace, Bold | Statistical confidence of the classified diagnosis: `(confidence * 100).toFixed(0)%` (e.g. `98%`). |
+    | **10** | **Health Index** | Right | Monospace, Bold | Overall composite health index (`0–100`):<br>• `< 40`: Red<br>• `40–69`: Amber<br>• `≥ 70`: Emerald. |
+
+    ***
+
+    ## 4. Component 3: Selected Well Diagnostic Detail (`Panel` — Detail Inspector)
+
+    Positioned on the right side of the split screen. Dynamically updates when an operator clicks any well in the queue.
+
+    ### A. Inspector Header & Navigation
+    * **Title:** `{wellId} — {latchedFault || category}`
+    * **Subtitle:** `ML Scan Verdict: {verdict}`
+    * **Top Status Badges:**
+      * Severity Pill (`critical` / `warning` / `normal`).
+      * ML Confidence Pill (`ML Confidence: XX%`).
+      * Health Index Pill (`Health Index: XX/100`).
+      * Direct Link: `Open Well Monitor →` navigating to [`/wells/$wellId`](file:///x:/TAS/v2_ESP/esp-insight-suite/src/routes/wells.$wellId.tsx).
+
+    ***
+
+    ### B. Live Operational Status Banner
+    Renders one of three distinct diagnostic states:
+    1. **Critical / Tripped Banner (Red):**
+       * Pulsing red ping dot with headline: `ESP PUMP TRIPPED / 0.0 HZ ({category})`.
+       * Description explaining drive collapse and zero-frequency condition.
+       * Highlighted **Action Advisory** directing operator pre-restart checks.
+    2. **Anomaly / Warning Banner (Amber):**
+       * Pulsing amber ping dot with headline: `ANOMALY DETECTED: {latchedFault}`.
+       * Specific diagnostic description and recommended engineering mitigation.
+    3. **Nominal Banner (Emerald):**
+       * Green pulse icon with text: `Machine operating within nominal steady-state corridor`.
+       * Stamped timestamp of the latest scan.
+
+    ***
+
+    ### C. Sensor KPI Quad
+    Four quick-read diagnostic tiles:
+    * **Health Score:** Numerical value out of 100 (colored Red / Amber / Green).
+    * **Confidence:** Classification certainty percentage.
+    * **Frequency:** Live operating frequency (`Hz`) in Cyan (or Red if $0.0\text{ Hz}$).
+    * **Anomaly Drift:** Isolation Forest / autoencoder residual deviation score ($0.00–1.00$). Displays dynamic tags: `Nominal` ($\le 0.15$), `Drifting` ($0.16–0.40$), or `Deviating` ($> 0.40$).
+
+    ***
+
+    ### D. Model Prediction Section (`14-Fault Probability Spectrum`)
+    Displays the probabilistic distribution across the full fault catalog:
+
+    * **Header Metadata:** Model version badge (e.g. `fault-classifier-v3.0`), Baseline profile source (e.g. `anchor-FS-004-calibrated`), and calculation age (`Live` or `Xs ago`).
+    * **Tripped / Inactive Standby Handling:**
+      * If a pump is tripped ($0\text{ Hz}$), probability bars are suspended and a specialized alert appears:
+        > *"The ML anomaly model is optimized for active flow dynamics. Because this pump is tripped (0 Hz), probability bars are suspended and deterministic SCADA safety envelopes are active below."*
+    * **Active Probability Bars:**
+      * Displays probability bars sorted from highest likelihood to lowest.
+      * **Supported AI Classes:** Displays percentage (`%`) and color-coded bars:
+        * `> 40%`: Red (Primary suspect).
+        * `10% – 40%`: Amber (Secondary indicator).
+        * `< 10%`: Emerald / Muted (Low probability).
+      * **Untrained / Unmodeled Faults:** Classes without trained inference weights are rendered with an explicit badge: `not modelled` (preventing fake or flat noise numbers).
+
+    ***
+
+    ### E. Physics Reservoir Check & Deterministic SCADA Rules
+    Combines AI classification with hard physical laws:
+
+    1. **Physics Reservoir Check (`Activity` Icon):**
+       * Evaluates hydrodynamic indicators (e.g. pump-off drawdown score, gas void fraction, solids friction).
+       * Displays status badge: `Nominal` (Green) or `Flagged` (Amber).
+    2. **SCADA Rule-Based Checks (Deterministic Protection):**
+       * Displays count of triggered rules (e.g. `0 Triggered` vs `3 Triggered`).
+       * If nominal: Green checkmark with text `All SCADA envelope thresholds within normal operating limits.`
+       * If triggered: Renders individual classified cards:
+         * **Critical Envelope Breach (`AlertTriangle`, Red):** Emergency shut-off or high trip threshold.
+         * **Out of Operating Limits (`Gauge`, Amber):** PIP below bubble point, severe downthrust flow.
+         * **Electrical Trip / Fault (`Zap`, Sky Blue):** Phase imbalance, voltage collapse, underload current.
+
+    ***
+
+    ## 5. Component 4: Open States, Alerts and Alarms Category List
+
+    Located across the bottom of the page (`Panel`):
+
+    * **Title:** `Open States, Alerts and Alarms Category List`
+    * **Subtitle:** `Live distribution of fleet operating states, fault types (leaving healthy state), alerts, alarms and healthy wells from SCADA & ML Model`
+    * **Visual Progress Grid:**
+      * Responsive 4-column card grid (`sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`).
+      * Aggregates the 10 wells into discrete operating categories (e.g. `Healthy State`, `Underload Pump-Off`, `Outside ROR`, `Gas Interference`).
+      * Displays well count (`X wells`) and a proportional progress bar colored according to category type:
+        * `Healthy / Normal`: Emerald green (`bg-emerald-500`).
+        * `Trip / Overload / Power Loss`: Red (`bg-red-500`).
+        * `Anomalies / Warnings`: Amber (`bg-amber-500`).
+
+    ***
+
+    ## 6. Data Architecture, Synchronization & Reactivity
+
+    ```mermaid
+    sequenceDiagram
+        autonumber
+        actor Operator
+        participant UI as WorkingStatusPage
+        participant API as FastAPI Backend (:8000)
+        participant WS as WebSocket (/telemetry/ws)
+        participant DB as PostgreSQL 184 (esp_apm_db)
+
+        Operator->>UI: Navigates to /working-status
+        UI->>API: GET /api/esp/working-status (Polls every 8s)
+        API->>DB: Queries latest esp_unified_assessments & opg_well_telemetry
+        DB-->>API: 10 Well Working Status Records
+        API-->>UI: Initial Page State (items[])
+        
+        loop Every 1 Second
+            WS-->>UI: msg.type == "LIVE_TELEMETRY"
+            Note over UI: Updates ONLY raw measurements (Freq, PIP, PDP, Amps, Temp, Vib)<br/>Never mutates ML status, category, or verdict.
+        end
+
+        loop On ML Inference Cycle
+            WS-->>UI: msg.type == "ESP_ASSESSMENT"
+            Note over UI: Atomically replaces entire well row (verdict, healthScore, probabilities)<br/>Guarded by ISO timestamp check (ts >= current.updatedAt).
+        end
+
+        Operator->>UI: Clicks "Critical" toggle
+        UI->>UI: In-memory filter: items.filter(severity == 'critical' || liveTripped)
+        Operator->>UI: Clicks Row "FS-004"
+        UI->>UI: Updates selectedId, re-evaluates prepareWorkingStatusPanelData()
+    ```
+
+    ### State Synchronization Safeguards
+    1. **Separation of Telemetry vs. Assessments:**
+       * Raw high-frequency sensor updates (`LIVE_TELEMETRY`) update only measurement numbers. They cannot accidentally overwrite or flicker the AI verdict or health scores.
+    2. **Timestamp Guard (`newTs >= currTs`):**
+       * If an older REST polling response arrives after a newer WebSocket event, it is automatically discarded, preventing state regression.
+    3. **No Zero-Bar Fabrication:**
+       * If model inference is delayed or stopped, the UI explicitly flags `Prediction Status: Standby / Tripped` rather than fabricating zero or random probability bars.

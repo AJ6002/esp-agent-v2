@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import statistics
+import yaml
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -49,6 +51,8 @@ from app.schemas.esp_diagnosis import (
     WellComparisonReport,
     WellHealthReport,
     WellProductionSummary,
+    UIRouteEntry,
+    UINavigatorReport,
 )
 
 logger = logging.getLogger("app.esp_diagnosis")
@@ -1653,19 +1657,19 @@ def get_fleet_inventory_status(cluster: str | None = None) -> FleetInventoryRepo
         """)
         field_rows = cur.fetchall()
 
-        # Query live SCADA telemetry state per well (strictly for registered fleet assets)
-        cur.execute("""
-            WITH latest_telem AS (
-                SELECT DISTINCT ON (well_id)
-                    well_id, timestamp, operating_state, frequency_hz, motor_current_a, intake_pressure_psi, motor_temperature_c, vibration_g, trip_cause
+        # Query live SCADA telemetry state per well using index-based per-well lookup (avoids temp disk spill)
+        telem_rows = []
+        for w in well_rows:
+            cur.execute("""
+                SELECT well_id, timestamp, operating_state, frequency_hz, motor_current_a, intake_pressure_psi, motor_temperature_c, vibration_g
                 FROM opg_well_telemetry
-                WHERE well_id IN (SELECT well_id FROM asset_registry)
-                ORDER BY well_id, timestamp DESC
-            )
-            SELECT well_id, timestamp, operating_state, frequency_hz, motor_current_a, intake_pressure_psi, motor_temperature_c, vibration_g
-            FROM latest_telem;
-        """)
-        telem_rows = cur.fetchall()
+                WHERE well_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """, (w[0],))
+            t_row = cur.fetchone()
+            if t_row:
+                telem_rows.append(t_row)
 
         # Query latest forensic trip events (strictly for registered fleet assets)
         cur.execute("""
@@ -2780,21 +2784,21 @@ def rank_fleet_by_metric(metric: str = "vibration", sort_order: str = "DESC") ->
                 state = (st_map.get(wid) or "UNKNOWN").upper()
                 parsed_rows.append((wid, c, state, val))
         else:
-            cur.execute(f"""
-                WITH latest_telem AS (
-                    SELECT DISTINCT ON (well_id)
-                        well_id, timestamp, operating_state, {m_col} as val
+            cur.execute("SELECT well_id, cluster FROM asset_registry ORDER BY well_id;")
+            well_meta = cur.fetchall()
+            parsed_rows = []
+            for wid, cl in well_meta:
+                cur.execute(f"""
+                    SELECT operating_state, {m_col}
                     FROM opg_well_telemetry t
-                    WHERE well_id IN (SELECT well_id FROM asset_registry)
-                    ORDER BY well_id, timestamp DESC
-                )
-                SELECT w.well_id, w.cluster, t.operating_state, t.val
-                FROM asset_registry w
-                LEFT JOIN latest_telem t ON w.well_id = t.well_id
-                ORDER BY t.val DESC;
-            """)
-            raw = cur.fetchall()
-            parsed_rows = [(str(r[0]), str(r[1]), (r[2] or "UNKNOWN").upper(), float(r[3]) if r[3] is not None else 0.0) for r in raw]
+                    WHERE well_id = %s
+                    ORDER BY timestamp DESC
+                    LIMIT 1;
+                """, (wid,))
+                row = cur.fetchone()
+                st = str(row[0]).upper() if row and row[0] else "UNKNOWN"
+                val = float(row[1]) if row and row[1] is not None else 0.0
+                parsed_rows.append((str(wid), str(cl), st, val))
 
     all_vals = [r[3] for r in parsed_rows]
     med_val = float(statistics.median(all_vals)) if all_vals else 0.0
@@ -2918,7 +2922,7 @@ def get_self_capabilities() -> SelfKnowledgeReport:
         )
 
     md = (
-        "# [ESP APM] System Capability Manifest\n\n"
+        "# [ESP APM] System Capabilities Manifest\n\n"
         "**System Version**: `2.4.0` | **Engine**: Hybrid Semantic & Physics Decision Engine\n\n"
         + "\n".join(rows_md) + "\n"
         "---\n"
@@ -2927,7 +2931,7 @@ def get_self_capabilities() -> SelfKnowledgeReport:
 
     return SelfKnowledgeReport(
         intent="10.2 Capability List",
-        identity_title="ESP APM System Capability Manifest",
+        identity_title="ESP APM System Capabilities Manifest",
         version="2.4.0",
         capabilities=caps,
         markdown_report=md,
@@ -2986,19 +2990,20 @@ def get_self_boundaries() -> SelfKnowledgeReport:
 
 def get_self_fleet_scope() -> SelfKnowledgeReport:
     """Capability 10.4: Dynamic fleet scope query directly against PostgreSQL Server 184."""
+    rows = []
     with get_esp_cursor() as cur:
-        cur.execute("""
-            WITH latest_telem AS (
-                SELECT DISTINCT ON (well_id) well_id, operating_state
-                FROM opg_well_telemetry
-                ORDER BY well_id, timestamp DESC
-            )
-            SELECT w.well_id, w.cluster, COALESCE(w.motor_hp, 0), COALESCE(t.operating_state, 'UNKNOWN')
-            FROM asset_registry w
-            LEFT JOIN latest_telem t ON w.well_id = t.well_id
-            ORDER BY w.cluster, w.well_id;
-        """)
-        rows = cur.fetchall()
+        cur.execute("SELECT well_id, cluster, COALESCE(motor_hp, 0) FROM asset_registry ORDER BY cluster, well_id;")
+        well_meta = cur.fetchall()
+        for wid, cl, hp in well_meta:
+            cur.execute("""
+                SELECT operating_state FROM opg_well_telemetry
+                WHERE well_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 1;
+            """, (wid,))
+            st_row = cur.fetchone()
+            st = st_row[0] if st_row and st_row[0] else "UNKNOWN"
+            rows.append((wid, cl, hp, st))
 
     assets = [
         MonitoredAssetScope(
@@ -3065,7 +3070,7 @@ def get_self_tasks() -> SelfKnowledgeReport:
     ]
 
     md = (
-        "# [ESP APM] Supported Tasks & Operational Workflows\n\n"
+        "# [ESP APM] Supported Tasks & Workflows (Operational Procedures)\n\n"
         "**Purpose**: Standard Operating Procedures (SOP) supported by the Copilot engine\n\n"
         + "\n".join([f"{i+1}. {t}" for i, t in enumerate(tasks)]) + "\n\n"
         "---\n"
@@ -3107,6 +3112,617 @@ def get_self_limitations() -> SelfKnowledgeReport:
     )
 
 
+# =========================================================================
+# DOMAIN 9: UI / NAVIGATION / ROUTE AWARENESS ENGINE
+# =========================================================================
+
+_REGISTERED_COMPONENTS = [
+    {
+        "id": "comp.esp_visualizer",
+        "entry_type": "component",
+        "title": "ESP 2D String Visualizer",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Appears on the Well Monitor & Downhole Detail screen (/wells/$wellId) and in preview mode on the ESP Fleet Cockpit (/).",
+        "displays": "Displays a 2D cross-section downhole schematic of the complete ESP string (centrifugal pump stages, intake/gas separator, protector seal section, electric submersible motor, downhole gauge sensor, and MLE/power cable) mapped against measured depth with dynamic thermal and mechanical stress indicators.",
+        "summary": "2D downhole schematic of pump, motor, seal, and sensor with mechanical and thermal stress indicators.",
+        "aliases": [
+            "2d esp string visualizer", "esp string visualizer", "2d string visualizer",
+            "string visualizer", "esp visualizer", "downhole schematic", "well schematic",
+            "2d well visual", "esp visual", "schematic visualizer", "downhole visualizer"
+        ],
+        "keywords": ["visualizer", "schematic", "2d", "string", "downhole", "motor", "pump stages"]
+    },
+    {
+        "id": "comp.pump_curve",
+        "entry_type": "component",
+        "title": "Live Pump Performance Curve",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Appears on the Well Monitor & Downhole Detail screen (/wells/$wellId).",
+        "displays": "Displays dynamic H-Q (Head vs Flow Rate) pump performance curves with affinity law speed scaling, recommended operating range (ROR) bounds, continuous operating point coordinates, and upthrust/downthrust limit envelopes.",
+        "summary": "Dynamic H-Q pump curve with affinity law scaling, operating point, and upthrust/downthrust limits.",
+        "aliases": [
+            "live pump performance curve", "pump performance curve", "pump curve",
+            "h-q curve", "head capacity curve", "pump curves", "dynamic pump curve",
+            "operating envelope curve", "hq curve"
+        ],
+        "keywords": ["pump curve", "head", "capacity", "h-q", "affinity laws", "operating point", "ror"]
+    },
+    {
+        "id": "comp.equalizer",
+        "entry_type": "component",
+        "title": "4-Subsystem Equalizer",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Appears on the Well Monitor & Downhole Detail screen (/wells/$wellId).",
+        "displays": "Displays multi-band health meters and alarm thresholds across 4 core ESP subsystems: Hydraulic (head, flow, intake/discharge pressure), Electrical (motor current, voltage, frequency, load), Thermal (motor winding temp, intake temp), and Mechanical (axial/radial vibration).",
+        "summary": "Multi-band health meters across Hydraulic, Electrical, Thermal, and Mechanical subsystems.",
+        "aliases": [
+            "4-subsystem equalizer", "subsystem equalizer", "equalizer",
+            "subsystem health meters", "subsystem meters", "four subsystem equalizer"
+        ],
+        "keywords": ["equalizer", "subsystem", "hydraulic", "electrical", "thermal", "mechanical"]
+    },
+    {
+        "id": "comp.pressure_profile",
+        "entry_type": "component",
+        "title": "Pressure-Depth Profile",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Appears on the Well Monitor & Downhole Detail screen (/wells/$wellId).",
+        "displays": "Displays wellbore pressure profile curves from pump intake depth to surface wellhead, showing static and flowing pressure gradients alongside bubble point pressure.",
+        "summary": "Wellbore pressure gradient from intake to wellhead with flowing vs static curves.",
+        "aliases": [
+            "pressure-depth profile", "pressure depth profile", "wellbore pressure gradient",
+            "depth pressure profile", "pressure profile", "depth profile"
+        ],
+        "keywords": ["pressure profile", "depth", "gradient", "flowing pressure", "intake pressure"]
+    },
+    {
+        "id": "comp.kpi_strip",
+        "entry_type": "component",
+        "title": "Top KPI Strip",
+        "parent_route_id": "route.fleet_cockpit",
+        "path": "/",
+        "location": "Appears across the top header of the ESP Fleet Cockpit (/), Well Working Status (/working-status), and Well Monitor (/wells/$wellId).",
+        "displays": "Displays 6 fleet-wide composite operational metrics: Active Monitored Assets (e.g. 10/10), Fleet Availability (%), Total Gross Liquid (BPD), Total Oil Deferment (BOPD), Dominant Trip Cause, and Fleet Mean Run Life (MTBF).",
+        "summary": "6 fleet composite metrics: Active Assets, Availability, Gross Liquid, Deferment, Dominant Trip, and MTBF.",
+        "aliases": [
+            "top kpi strip", "kpi strip", "kpi cards", "fleet kpis", "kpi banner", "kpi bar"
+        ],
+        "keywords": ["kpi", "kpi strip", "composite metrics", "availability", "deferment"]
+    },
+    {
+        "id": "comp.fleet_table",
+        "entry_type": "component",
+        "title": "Fleet Surveillance Table",
+        "parent_route_id": "route.fleet_cockpit",
+        "path": "/",
+        "location": "Appears as the central multi-discipline asset surveillance grid on the ESP Fleet Cockpit (/).",
+        "displays": "Displays a comprehensive grid of all 10 monitored wells showing real-time operational status pills (Running, Tripped, Outside ROR), frequency (Hz), motor current (A), intake/discharge pressures, production flow rates (BPD), and quick-action navigation buttons.",
+        "summary": "Comprehensive 10-well asset grid with live telemetry, operating states, and direct navigation links.",
+        "aliases": [
+            "fleet surveillance table", "fleet table", "fleettable", "asset table",
+            "fleet grid", "surveillance table", "fleet list"
+        ],
+        "keywords": ["fleet table", "grid", "surveillance table", "asset grid", "all wells table"]
+    },
+    {
+        "id": "comp.working_status_queue",
+        "entry_type": "component",
+        "title": "Working Status Diagnostic Queue",
+        "parent_route_id": "route.working_status",
+        "path": "/working-status",
+        "location": "Appears on the Well Working Status screen (/working-status).",
+        "displays": "Displays the master surveillance queue of assets ranked by composite anomaly score, showing 14-fault classifier spectrum probabilities, SCADA safety envelope violations, and thermodynamic physics alarms.",
+        "summary": "Surveillance queue ranked by anomaly score with 14-fault classifier spectrum probabilities.",
+        "aliases": [
+            "working status queue", "diagnostic queue", "fault queue", "status queue",
+            "working status table", "master queue", "working status list"
+        ],
+        "keywords": ["working status queue", "diagnostic queue", "anomaly ranking", "fault queue"]
+    },
+    {
+        "id": "comp.formula_editor",
+        "entry_type": "component",
+        "title": "Fleet KPI Formulas Editor",
+        "parent_route_id": "route.live_calculations",
+        "path": "/live-calculations",
+        "location": "Appears under Tab 2 of the Live Calculations screen (/live-calculations).",
+        "displays": "Displays the governed mathematical formula editor and execution registry for Virtual Flow Metering (VFM), composite health indices, and volumetric efficiency equations.",
+        "summary": "Governed mathematical formula editor and execution registry for VFM and fleet KPI equations.",
+        "aliases": [
+            "fleet kpi formulas editor", "formula editor", "formulas editor",
+            "vfm formula editor", "fleet formula editor", "formula registry"
+        ],
+        "keywords": ["formula editor", "formulas", "vfm equation", "mathematical model", "registry"]
+    },
+    {
+        "id": "comp.event_timeline",
+        "entry_type": "component",
+        "title": "Event Timeline & Incident Lifecycle Table",
+        "parent_route_id": "route.event_intelligence",
+        "path": "/events",
+        "location": "Appears on the Event Intelligence & Forensics screen (/events & /events/$eventId).",
+        "displays": "Displays chronological audit stream of pump trips and alarms with active incident second-counters, severity indicators, pre-trip anomaly window captures, and standard operating procedure (SOP) action checklists.",
+        "summary": "Chronological audit stream of pump trips with active incident counters and SOP checklists.",
+        "aliases": [
+            "incident lifecycle table", "event timeline", "events table", "trip forensics workspace",
+            "incident table", "trip timeline", "event list", "alarms table"
+        ],
+        "keywords": ["incident lifecycle", "timeline", "trip forensics", "sop checklist", "events"]
+    },
+    {
+        "id": "comp.report_builder",
+        "entry_type": "component",
+        "title": "Report Builder & Preview",
+        "parent_route_id": "route.reports_hub",
+        "path": "/reports",
+        "location": "Appears on the Operational Reports Hub (/reports).",
+        "displays": "Displays operational report configuration forms, live audit document previews, zero-fabrication data gate validation alerts, and governed Excel/CSV export triggers.",
+        "summary": "Report configuration forms, document previews, zero-fabrication validation, and export triggers.",
+        "aliases": [
+            "report builder", "report preview", "reports builder", "governed report preview",
+            "insufficient data gate", "report generator", "excel export tool"
+        ],
+        "keywords": ["report builder", "preview", "governance", "export", "zero fabrication"]
+    },
+    {
+        "id": "comp.scenario_bench",
+        "entry_type": "component",
+        "title": "Scenario Configuration Bench",
+        "parent_route_id": "route.scenario_simulator",
+        "path": "/custom-testing",
+        "location": "Appears on the What-If Scenario Simulator screen (/custom-testing).",
+        "displays": "Displays interactive 14-channel telemetry parameter adjustment sliders, historical operational baseline cloning tools, and synthetic fault injection presets (gas interference, deadhead, severe underload).",
+        "summary": "Interactive 14-channel parameter sliders, baseline cloning, and fault injection presets.",
+        "aliases": [
+            "scenario configuration bench", "scenario bench", "what-if bench",
+            "simulator bench", "telemetry input grid", "simulation sliders"
+        ],
+        "keywords": ["scenario bench", "what if", "sliders", "fault injection", "simulation"]
+    }
+]
+
+_REGISTERED_CONCEPTS = [
+    {
+        "id": "concept.14_fault",
+        "entry_type": "concept",
+        "title": "14-Fault Classifier Spectrum",
+        "parent_route_id": "route.working_status",
+        "path": "/working-status",
+        "location": "Feature of Well Working Status (/working-status)",
+        "means": "A multi-class machine learning classification engine that continuously scores SCADA telemetry against 14 recognized ESP failure modes (including Gas Lock, Pump-off, Severe Scale, Broken Shaft, Phase Unbalance, and Underload).",
+        "matters": "It enables petroleum surveillance engineers to detect developing downhole abnormalities hours or days before an electrical or mechanical trip occurs, preventing deferred production and premature equipment teardown.",
+        "summary": "Multi-class ML classification engine continuously scoring telemetry against 14 recognized ESP failure modes.",
+        "aliases": [
+            "14-fault classifier spectrum", "14 fault classifier", "fault classifier",
+            "14 fault spectrum", "anomaly score", "ml fault spectrum", "14 faults"
+        ],
+        "keywords": ["14 fault", "classifier", "fault spectrum", "anomaly score", "ml fault"]
+    },
+    {
+        "id": "concept.vfm",
+        "entry_type": "concept",
+        "title": "Virtual Flow Metering (VFM)",
+        "parent_route_id": "route.live_calculations",
+        "path": "/live-calculations",
+        "location": "Feature of Live Calculations (/live-calculations)",
+        "means": "A thermodynamic and hydrodynamic mathematical framework that calculates real-time gross liquid flow rate (BPD) and water cut from pump intake/discharge differential pressures, fluid specific gravity, and motor brake horsepower.",
+        "matters": "It provides continuous, well-by-well production monitoring without requiring expensive physical test separators or frequent surface well tests.",
+        "summary": "Thermodynamic and hydrodynamic mathematical framework calculating real-time gross liquid flow rate and water cut.",
+        "aliases": [
+            "virtual flow metering", "vfm", "virtual flow meter", "derived flow rate",
+            "thermodynamic vfm"
+        ],
+        "keywords": ["vfm", "virtual flow metering", "derived rate", "hydrodynamic", "flow rate"]
+    },
+    {
+        "id": "concept.affinity_laws",
+        "entry_type": "concept",
+        "title": "Affinity Laws",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Feature of Well Monitor & Downhole Detail (/wells/$wellId)",
+        "means": "Mathematical scaling relationships for centrifugal pumps stating that flow rate varies directly with rotational speed, head varies with the square of speed, and hydraulic power varies with the cube of speed.",
+        "matters": "They allow the platform to scale manufacturer baseline pump curves dynamically as the variable speed drive (VSD) frequency changes between 30 Hz and 65 Hz, providing an accurate operating envelope.",
+        "summary": "Centrifugal pump scaling laws dynamically scaling H-Q pump curves with VSD frequency changes.",
+        "aliases": [
+            "affinity laws", "pump affinity laws", "speed scaling laws"
+        ],
+        "keywords": ["affinity laws", "scaling", "speed scaling", "vsd frequency", "pump laws"]
+    },
+    {
+        "id": "concept.zero_fabrication",
+        "entry_type": "concept",
+        "title": "Zero Fabrication Data Readiness Gate",
+        "parent_route_id": "route.reports_hub",
+        "path": "/reports",
+        "location": "Feature of Reports Hub (/reports)",
+        "means": "A platform governance policy that enforces strict audit integrity by refusing to interpolate, fabricate, or render synthetic numbers when raw SCADA telemetry is stale, missing, or below readiness thresholds.",
+        "matters": "It guarantees that official operational and compliance reports exported to operators and regulatory partners represent empirical, verifiable ground truth rather than hallucinated or estimated figures.",
+        "summary": "Governance policy enforcing audit integrity by refusing to fabricate numbers when telemetry is missing or stale.",
+        "aliases": [
+            "zero fabrication", "zero-fabrication", "data readiness gate", "zero fabrication policy",
+            "anti-hallucination gate"
+        ],
+        "keywords": ["zero fabrication", "data readiness", "governance", "audit integrity", "no placeholder"]
+    },
+    {
+        "id": "concept.ror",
+        "entry_type": "concept",
+        "title": "Recommended Operating Range (ROR)",
+        "parent_route_id": "route.well_detail",
+        "path": "/wells/$wellId",
+        "location": "Feature of Well Monitor & Downhole Detail (/wells/$wellId)",
+        "means": "The optimal flow capacity corridor between the downthrust limit (minimum continuous flow) and upthrust limit (maximum continuous flow) on the ESP pump performance curve.",
+        "matters": "Operating outside the ROR induces excessive axial thrust and mechanical vibration on pump impellers and bearings, drastically reducing run life and triggering premature pump failure.",
+        "summary": "Optimal flow capacity corridor between downthrust and upthrust limits on the pump curve.",
+        "aliases": [
+            "recommended operating range", "ror", "operating envelope", "pump operating range",
+            "continuous operating envelope"
+        ],
+        "keywords": ["ror", "recommended operating range", "downthrust", "upthrust", "operating envelope"]
+    },
+    {
+        "id": "concept.trip_forensics",
+        "entry_type": "concept",
+        "title": "Trip Forensics Workspace",
+        "parent_route_id": "route.event_intelligence",
+        "path": "/events",
+        "location": "Feature of Event Intelligence & Forensics (/events)",
+        "means": "A forensic analysis environment capturing synchronized high-frequency telemetry preceding an ESP trip, isolating electrical, mechanical, and process sensor trends across the failure window.",
+        "matters": "It allows surveillance engineers and electrical technicians to establish unambiguous root cause (e.g. distinguishing a true downhole lockup from an upstream power supply brownout) before restarting.",
+        "summary": "Forensic environment capturing high-frequency telemetry preceding trips for root-cause isolation.",
+        "aliases": [
+            "trip forensics", "trip forensics workspace", "event forensics",
+            "forensics workspace"
+        ],
+        "keywords": ["trip forensics", "forensics", "root cause", "high frequency", "failure window"]
+    }
+]
+
+_UI_MAP_REGISTRY: dict[str, Any] | None = None
+
+
+def _resolve_ui_map_path() -> str | None:
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "..", "data", "ui_map.yaml"),
+        os.path.join(os.path.dirname(__file__), "..", "data", "ui_map.yaml"),
+        os.path.abspath("apps/api/data/ui_map.yaml"),
+        os.path.abspath("agent_service_v2/app/data/ui_map.yaml"),
+        os.path.abspath("ui_map.yaml"),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return os.path.abspath(c)
+    return None
+
+
+def load_ui_map() -> dict[str, Any]:
+    """Load and index ui_map.yaml into a fast in-memory multi-index dictionary."""
+    global _UI_MAP_REGISTRY
+    if _UI_MAP_REGISTRY is not None:
+        return _UI_MAP_REGISTRY
+
+    registry: dict[str, Any] = {
+        "entries": {},
+        "aliases": {},
+        "keywords": {},
+        "components": {},
+        "concepts": {},
+    }
+
+    yaml_path = _resolve_ui_map_path()
+    if yaml_path and os.path.exists(yaml_path):
+        try:
+            with open(yaml_path, encoding="utf-8") as f:
+                doc = yaml.safe_load(f) or {}
+            for e in doc.get("entries", []):
+                rid = e.get("route_id")
+                if not rid:
+                    continue
+                entry_obj = UIRouteEntry(
+                    route_id=rid,
+                    entry_type=e.get("type", "route"),
+                    title=e.get("title", rid),
+                    path=e.get("path"),
+                    workspace=e.get("workspace"),
+                    summary=e.get("summary", ""),
+                    aliases=e.get("aliases", []),
+                    keywords=e.get("keywords", []),
+                    related=e.get("related", []),
+                    authority=e.get("authority"),
+                    last_reviewed=str(e.get("last_reviewed") or ""),
+                    description=e.get("description", ""),
+                )
+                registry["entries"][rid] = entry_obj
+                for a in entry_obj.aliases:
+                    registry["aliases"][a.lower().strip()] = rid
+                for kw in entry_obj.keywords:
+                    registry["keywords"].setdefault(kw.lower().strip(), set()).add(rid)
+        except Exception as err:
+            logger.warning(f"Failed to parse ui_map.yaml: {err}")
+
+    for c in _REGISTERED_COMPONENTS:
+        cid = c["id"]
+        c_entry = UIRouteEntry(
+            route_id=c["parent_route_id"],
+            entry_type="component",
+            title=c["title"],
+            path=c.get("path"),
+            summary=c["summary"],
+            aliases=c.get("aliases", []),
+            keywords=c.get("keywords", []),
+            parent_route_id=c["parent_route_id"],
+            location=c["location"],
+            displays=c["displays"],
+            description=c["displays"],
+        )
+        registry["components"][cid] = c_entry
+        for a in c.get("aliases", []):
+            registry["aliases"][a.lower().strip()] = cid
+        for kw in c.get("keywords", []):
+            registry["keywords"].setdefault(kw.lower().strip(), set()).add(cid)
+
+    for c in _REGISTERED_CONCEPTS:
+        cid = c["id"]
+        c_entry = UIRouteEntry(
+            route_id=c["parent_route_id"],
+            entry_type="concept",
+            title=c["title"],
+            path=c.get("path"),
+            summary=c["summary"],
+            aliases=c.get("aliases", []),
+            keywords=c.get("keywords", []),
+            parent_route_id=c["parent_route_id"],
+            location=c["location"],
+            means=c["means"],
+            matters=c["matters"],
+            description=f"{c['means']} {c['matters']}",
+        )
+        registry["concepts"][cid] = c_entry
+        for a in c.get("aliases", []):
+            registry["aliases"][a.lower().strip()] = cid
+        for kw in c.get("keywords", []):
+            registry["keywords"].setdefault(kw.lower().strip(), set()).add(cid)
+
+    _UI_MAP_REGISTRY = registry
+    return _UI_MAP_REGISTRY
+
+
+def lookup_ui_route(question: str, entity: str | None = None) -> tuple[UIRouteEntry | None, list[str]]:
+    """Look up an entry from the in-memory UI map by alias, title, keyword, or semantic concept."""
+    reg = load_ui_map()
+    q = question.lower().strip()
+
+    # 1. Broad Workspace Index / All Screens trigger
+    overview_prompts = [
+        "show all screens", "show all routes", "list all screens", "list all routes",
+        "what screens", "what routes", "all screens", "all routes", "operations workspace",
+        "ops workspace", "operations overview", "screens overview", "available screens",
+        "available routes", "what pages", "list pages", "all pages", "show pages",
+    ]
+    if any(op in q for op in overview_prompts) and not any(r in q for r in ["working status", "cockpit", "well monitor", "calculations", "events", "reports", "simulator"]):
+        if "navigation.operations_workspace" in reg["entries"]:
+            return reg["entries"]["navigation.operations_workspace"], []
+
+    # 2. Check exact and substring alias matches (sorted by longest alias first)
+    sorted_aliases = sorted(reg["aliases"].items(), key=lambda x: len(x[0]), reverse=True)
+    for alias, item_id in sorted_aliases:
+        if alias in q:
+            if item_id in reg["entries"]:
+                return reg["entries"][item_id], []
+            if item_id in reg["components"]:
+                return reg["components"][item_id], []
+            if item_id in reg["concepts"]:
+                return reg["concepts"][item_id], []
+
+    # 3. Direct route_id lookup
+    for rid, entry in reg["entries"].items():
+        if rid.lower() in q or rid.replace("_", "-").lower() in q or rid.split(".")[-1] in q:
+            return entry, []
+
+    # 4. Keyword inverted index scoring
+    q_tokens = set(re.findall(r"\w+", q))
+    scores: dict[str, int] = {}
+    for kw, item_ids in reg["keywords"].items():
+        kw_tokens = set(re.findall(r"\w+", kw))
+        if kw_tokens and kw_tokens.issubset(q_tokens):
+            for iid in item_ids:
+                scores[iid] = scores.get(iid, 0) + len(kw_tokens)
+
+    if scores:
+        sorted_items = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        top_id, top_score = sorted_items[0]
+
+        if len(sorted_items) > 1 and sorted_items[1][1] == top_score and top_score >= 2:
+            candidates: list[str] = []
+            for iid, _ in sorted_items[:3]:
+                cand_entry = reg["entries"].get(iid) or reg["components"].get(iid) or reg["concepts"].get(iid)
+                if cand_entry and cand_entry.title not in candidates:
+                    candidates.append(cand_entry.title)
+            if len(candidates) >= 2:
+                return None, candidates
+
+        if top_id in reg["entries"]:
+            return reg["entries"][top_id], []
+        if top_id in reg["components"]:
+            return reg["components"][top_id], []
+        if top_id in reg["concepts"]:
+            return reg["concepts"][top_id], []
+
+    return None, []
+
+
+def get_ui_navigation_narrative(
+    question: str,
+    entity: str | None = None,
+    event_id: str | None = None,
+) -> UINavigatorReport:
+    """Retrieve entry from platform guide and narrate using Qwen 2.5 on Server 188 with strict structure."""
+    entry, candidates = lookup_ui_route(question, entity)
+
+    # Missing entry or out-of-scope query
+    if entry is None:
+        if candidates:
+            clarify_text = (
+                f"Multiple platform screens match your query:\n"
+                + "\n".join([f"- **{c}**" for c in candidates])
+                + "\n\nPlease specify which screen you would like to navigate to."
+            )
+            return UINavigatorReport(
+                intent="UI_NAVIGATION",
+                route_id="route.ambiguous",
+                entry_type="route",
+                title="Ambiguous Navigation Request",
+                summary="Multiple candidate routes identified.",
+                narrative=clarify_text,
+                suggested_options=candidates,
+                markdown_report=clarify_text,
+            )
+
+        return UINavigatorReport(
+            intent="UI_NAVIGATION",
+            route_id="route.unknown",
+            entry_type="route",
+            title="Undocumented Route",
+            summary="Feature not present in platform guide.",
+            narrative="That's not documented in the platform guide yet.",
+            suggested_options=["Operations Workspace", "Working Status", "Fleet Cockpit"],
+            markdown_report="That's not documented in the platform guide yet.",
+        )
+
+    raw_path = entry.path or "/"
+    resolved_path = raw_path
+    target_well = entity or "FS-017"
+    target_event = event_id or "EV-20261012-101438-FS-017-571"
+    resolved_path = resolved_path.replace("$wellId", target_well).replace("$eventId", target_event)
+
+    source_route_id = entry.parent_route_id or entry.route_id
+
+    entry_context_lines = [
+        f"Entry Type: {entry.entry_type.title()}",
+        f"Route ID: {source_route_id}",
+        f"Title: {entry.title}",
+        f"Path: {resolved_path}",
+        f"Summary: {entry.summary}",
+    ]
+    if entry.location:
+        entry_context_lines.append(f"Location: {entry.location}")
+    if entry.displays:
+        entry_context_lines.append(f"Displays: {entry.displays}")
+    if entry.means:
+        entry_context_lines.append(f"Meaning: {entry.means}")
+    if entry.matters:
+        entry_context_lines.append(f"Importance: {entry.matters}")
+    if entry.description and len(entry.description) > len(entry.summary):
+        entry_context_lines.append(f"Specification: {entry.description[:800]}")
+
+    entry_context = "\n".join(entry_context_lines)
+
+    system_prompt = (
+        "You are the ADVAIT ESP APM Navigation Assistant. A petroleum\n"
+        "engineer is asking about UI features.\n\n"
+        "You will receive one retrieved entry from the platform guide.\n"
+        "Narrate it back to the user. You do not add information not in\n"
+        "the entry. You do not invent features, routes, or capabilities.\n\n"
+        "Structure your answer by entry type:\n"
+        "  - Route:     what the screen does, what it contains,\n"
+        "               how to navigate to it\n"
+        "  - Component: what it displays, where it appears on the platform\n"
+        "  - Concept:   what it means, why it matters\n\n"
+        "Keep it to 1–2 short paragraphs. Professional tone. No filler.\n\n"
+        'If the retrieved entry is missing or does not cover the query,\n'
+        'respond: "That\'s not documented in the platform guide yet."\n\n'
+        "End with the source route_id in brackets, e.g.\n"
+        "[route.working-status]."
+    )
+
+    narrative = None
+    if llm_client.enabled:
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": f"Retrieved Entry:\n{entry_context}\n\nQuestion: {question}",
+                },
+            ]
+            resp = llm_client.chat(messages, max_tokens=300)
+            if resp.get("content") and not resp.get("error"):
+                raw_llm = resp["content"].strip()
+                if raw_llm:
+                    narrative = raw_llm
+                    if f"[{source_route_id}]" not in narrative and not narrative.endswith("]"):
+                        narrative = f"{narrative}\n\n[{source_route_id}]"
+        except Exception as e:
+            logger.warning(f"Domain 9 LLM narration failed: {e}")
+
+    if not narrative:
+        if entry.entry_type == "component":
+            displays_text = entry.displays or entry.summary
+            location_text = entry.location or f"Appears on {resolved_path}."
+            narrative = (
+                f"{displays_text}\n\n"
+                f"{location_text}\n\n"
+                f"[{source_route_id}]"
+            )
+        elif entry.entry_type == "concept":
+            means_text = entry.means or entry.summary
+            matters_text = entry.matters or "It provides essential engineering context for operational decision-making."
+            narrative = (
+                f"{means_text}\n\n"
+                f"{matters_text}\n\n"
+                f"[{source_route_id}]"
+            )
+        else:
+            nav_instruction = f"Navigate to this screen by selecting '{entry.title}' in the Operations Workspace navigation hierarchy, or directly accessing `{resolved_path}`."
+            narrative = (
+                f"The {entry.title} screen provides {entry.summary.lower() if entry.summary else 'operational surveillance'}. It contains real-time asset telemetry, diagnostic views, and engineering surveillance metrics for the Farha South fleet.\n\n"
+                f"{nav_instruction}\n\n"
+                f"[{source_route_id}]"
+            )
+
+    action_chips = [f"[Open {resolved_path}]"]
+    if source_route_id != "route.working_status":
+        action_chips.append("[What is Working Status?]")
+    if source_route_id != "route.live_calculations":
+        action_chips.append("[Where are Live Calculations?]")
+    if source_route_id != "route.fleet_cockpit":
+        action_chips.append("[Go to Fleet Cockpit]")
+
+    suggested_options = [
+        f"Open {resolved_path}",
+        "Well Working Status",
+        "Operations Workspace Index",
+    ]
+
+    md_report = (
+        f"# [ESP APM Navigation] {entry.title}\n\n"
+        f"**Route Path**: `{resolved_path}` | **Type**: `{entry.entry_type.title()}` | **Source**: `[{source_route_id}]`\n\n"
+        f"{narrative}\n\n"
+        f"---\n"
+        f"### Quick Navigation Actions:\n"
+        + "\n".join([f"- {chip}" for chip in action_chips]) + "\n"
+    )
+
+    return UINavigatorReport(
+        intent="UI_NAVIGATION",
+        route_id=source_route_id,
+        entry_type=entry.entry_type,
+        title=entry.title,
+        path=entry.path,
+        resolved_path=resolved_path,
+        summary=entry.summary,
+        narrative=narrative,
+        related_routes=entry.related,
+        suggested_options=suggested_options,
+        markdown_report=md_report,
+    )
+
+
 def route_query_hybrid(
     question: str,
     conversation_history: list[dict[str, Any]] | None = None,
@@ -3124,6 +3740,11 @@ def route_query_hybrid(
     q_lower = re.sub(r"\bpls\b|\bplz\b", "please", q_lower)
     q_lower = re.sub(r"\bthx\b|\bthanx\b", "thanks", q_lower)
 
+    # 1. Extract Well IDs & Event ID early to protect operational and diagnostic inquiries
+    all_wells = extract_all_well_ids(question)
+    ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
+    event_id = ev_match.group(1) if ev_match else None
+
     # =========================================================================
     # TIER 0.SELF_KNOWLEDGE: Domain 10 Self-Knowledge, Boundaries & Identity Routing
     # =========================================================================
@@ -3131,14 +3752,23 @@ def route_query_hybrid(
     # 10.3 Boundary & Physical Actuation Refusals
     boundary_triggers = [
         "what can't you do", "what cant you do", "can't do", "cant do", "what are you unable",
+        "what can you not do", "cannot do", "out of scope", "outside your scope",
         "can you start", "start the pump", "stop the pump", "can you stop", "control the pump",
         "control the well", "change frequency", "change speed", "actuate", "remote control",
-        "turn on", "turn off", "shut down", "shutdown", "power on", "power off", "run the pump",
-        "trip the pump", "open choke", "close choke", "increase frequency", "decrease frequency",
-        "set frequency", "modulate frequency", "vsd write", "scada write",
-        "system boundary", "system boundaries", "your boundaries", "what is outside your scope"
+        "can you turn on", "can you turn off", "turn on the pump", "turn off the pump",
+        "can you shut", "please shut", "shut down the", "shutdown the", "shut down pump",
+        "shutdown pump", "shut down well", "shutdown well", "execute shutdown", "initiate shutdown",
+        "power on the", "power off the", "run the pump", "trip the pump", "open choke", "close choke",
+        "increase frequency", "decrease frequency", "set frequency", "modulate frequency",
+        "vsd write", "scada write", "scada control", "physical control",
+        "system boundary", "system boundaries", "your boundaries", "operational boundaries",
+        "what is outside your scope", "what is out of scope"
     ]
-    if any(bt in q_lower for bt in boundary_triggers):
+    is_diagnostic_query = any(w in q_lower for w in [
+        "diagnos", "analyz", "what caused", "why did", "hypothesis", "confirmation test",
+        "investigat", "review", "past", "histor", "report", "latest", "previous", "prior", "waveform"
+    ])
+    if any(bt in q_lower for bt in boundary_triggers) and not is_diagnostic_query:
         return HybridRouteResult(
             intent=ESPIntentEnum.SELF_BOUNDARIES,
             confidence=0.99,
@@ -3151,7 +3781,12 @@ def route_query_hybrid(
         "what wells do you monitor", "list your wells", "list all wells", "fleet scope",
         "scope of fleet", "scope of wells", "wells you know", "wells you cover",
         "coverage of wells", "what clusters are monitored", "which clusters do you know",
-        "which wells are in your scope", "wells in scope", "monitored asset scope"
+        "which wells are in your scope", "wells in scope", "monitored asset scope",
+        "what fleet do you monitor", "what assets are under your surveillance",
+        "what assets do you monitor", "what do you monitor", "which assets do you cover",
+        "assets under surveillance", "assets under your surveillance", "monitored fleet scope",
+        "under your surveillance", "under surveillance", "currently under your surveillance",
+        "what fleet", "which fleet"
     ]
     if any(st in q_lower for st in scope_triggers):
         return HybridRouteResult(
@@ -3164,7 +3799,10 @@ def route_query_hybrid(
     limitations_triggers = [
         "what are your limitations", "your limitations", "what limitations", "what is missing",
         "what are you lacking", "what data is missing", "honest acknowledgment",
-        "limitations of the system", "blind spots", "known limitations"
+        "limitations of the system", "blind spots", "known limitations", "system limitations",
+        "what are your system limitations", "known constraints", "your known constraints",
+        "what are your known constraints", "system constraints", "disclose system limitations",
+        "disclose limitations", "known system limitations"
     ]
     if any(lt in q_lower for lt in limitations_triggers):
         return HybridRouteResult(
@@ -3177,7 +3815,8 @@ def route_query_hybrid(
     tasks_triggers = [
         "what tasks can you handle", "what tasks do you handle", "tasks you can do",
         "tasks you can handle", "supported workflows", "what workflows", "what tasks",
-        "tasks list", "objective list", "what objectives"
+        "tasks list", "objective list", "what objectives", "list supported workflows",
+        "supported tasks", "operating procedures", "standard operating procedures"
     ]
     if any(tt in q_lower for tt in tasks_triggers):
         return HybridRouteResult(
@@ -3190,7 +3829,10 @@ def route_query_hybrid(
     cap_triggers = [
         "what can you do", "what are your capabilities", "your capabilities",
         "list your capabilities", "show capabilities", "what features do you have",
-        "what are your features", "capabilities list", "help commands", "what functions"
+        "what are your features", "capabilities list", "help commands", "what functions",
+        "core features", "list your core features", "list features", "show features",
+        "key features", "system features", "platform features", "list your functions",
+        "what are your core features"
     ]
     if any(ct in q_lower for ct in cap_triggers):
         return HybridRouteResult(
@@ -3201,21 +3843,62 @@ def route_query_hybrid(
 
     # 10.1 Agent Identity
     identity_triggers = [
-        "what are you", "who are you", "what is your role", "what are your functions",
+        "who are you", "what is your role", "what are your functions",
         "introduce yourself", "tell me about yourself", "explain your purpose",
-        "explain what you are", "about you", "what is this system", "who created you"
+        "explain what you are", "what is this system", "who created you",
+        "system identity", "what is your system identity", "your identity",
+        "identity of the system", "system background", "your background"
     ]
-    if any(it in q_lower for it in identity_triggers):
+    # Check whole-word / regex for 'what are you' and 'about you' to prevent false substring matches on 'what are your ...'
+    is_identity_query = any(it in q_lower for it in identity_triggers) or bool(re.search(r"\bwhat are you\b", q_lower)) or bool(re.search(r"\babout you\b", q_lower))
+    if is_identity_query:
         return HybridRouteResult(
             intent=ESPIntentEnum.SELF_IDENTITY,
             confidence=0.99,
             routing_tier="TIER_0_REGEX",
         )
 
-    # 1. Extract Well IDs & Event ID
-    all_wells = extract_all_well_ids(question)
-    ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
-    event_id = ev_match.group(1) if ev_match else None
+    # =========================================================================
+    # TIER 0.UI_NAVIGATION: Domain 9 UI, Navigation, Screen & Concept Routing
+    # =========================================================================
+    ui_nav_keywords = [
+        "page", "screen", "route", "workspace", "navigation", "ui", "view", "menu",
+        "navigate to", "where can i find", "where is the", "where are the", "where are",
+        "how to get to", "how do i get to", "where do i find", "in the platform",
+        "show all screens", "list all screens", "show all routes", "list all routes",
+        "working status", "fleet cockpit", "well monitor", "well detail",
+        "live calculations", "event intelligence", "reports hub", "scenario simulator",
+        "operations workspace", "ops workspace", "string visualizer", "esp visualizer",
+        "downhole schematic", "pump performance curve", "pump curve", "h-q curve",
+        "subsystem equalizer", "equalizer", "pressure-depth profile", "kpi strip",
+        "fleet table", "fleettable", "diagnostic queue", "formula editor",
+        "formulas editor", "incident lifecycle table", "trip forensics workspace",
+        "report builder", "scenario configuration bench", "scenario bench",
+        "14-fault classifier", "14 fault classifier", "fault spectrum",
+        "virtual flow metering", "vfm", "affinity laws", "zero fabrication",
+        "data readiness gate", "recommended operating range", "ror", "operating envelope"
+    ]
+    is_ui_query = any(k in q_lower for k in ui_nav_keywords)
+    if is_ui_query or ("what is" in q_lower and any(w in q_lower for w in ["page", "screen", "route", "workspace", "status", "cockpit", "monitor", "calculations", "simulator", "reports", "visualizer", "equalizer", "curve", "vfm"])):
+        target_entity = all_wells[0] if all_wells else None
+        matched_entry, candidates = lookup_ui_route(question, target_entity)
+        if matched_entry is not None or candidates or any(w in q_lower for w in ["page", "screen", "route", "where can i find", "how do i navigate"]):
+            if candidates and not matched_entry:
+                return HybridRouteResult(
+                    intent=ESPIntentEnum.UI_NAVIGATION,
+                    entity=target_entity,
+                    confidence=0.75,
+                    routing_tier="TIER_0_UI_NAVIGATION",
+                    needs_clarification=True,
+                    clarification_question="Multiple platform screens match your query. Which view would you like to explore?",
+                    suggested_options=candidates,
+                )
+            return HybridRouteResult(
+                intent=ESPIntentEnum.UI_NAVIGATION,
+                entity=target_entity,
+                confidence=0.99,
+                routing_tier="TIER_0_UI_NAVIGATION",
+            )
 
     # TIER 0.COMPARE_EVENT: Before vs After Event Comparison (Capability 2.5)
     before_after_words = [
@@ -3368,7 +4051,9 @@ def route_query_hybrid(
         prod_words = [
             "fleet production", "total production", "fleet deferment", "deferred oil",
             "production deferment", "fleet output", "fleet capacity", "total bpd",
-            "gross liquid across fleet", "oil lost across fleet", "fleet bpd", "fleet bopd"
+            "gross liquid across fleet", "oil lost across fleet", "fleet bpd", "fleet bopd",
+            "gross liquid", "net oil", "daily production", "gross production", "oil production",
+            "liquid production", "daily gross liquid", "oil lost"
         ]
         if any(w in q_lower for w in prod_words):
             return HybridRouteResult(
@@ -3573,9 +4258,12 @@ def route_query_hybrid(
                         "Classify the user query into ONE of these intents: "
                         "KNOWLEDGE (petroleum engineering manuals, gas lock, bearing wear, electrical, standards), "
                         "FLEET_INVENTORY (wells count, clusters), "
+                        "FLEET_PRODUCTION (total fleet production, bpd, deferment), "
+                        "SELF_CAPABILITIES (capabilities, features list), "
+                        "SELF_LIMITATIONS (limitations, constraints), "
                         "CHAT (clear greetings like hi, hello, how are you), "
                         "AMBIGUOUS (unclear, ambiguous, or unclassified requests). "
-                        "Return ONLY valid JSON: {\"intent\": \"KNOWLEDGE\"|\"FLEET_INVENTORY\"|\"CHAT\"|\"AMBIGUOUS\", \"topic\": \"extracted topic\"}"
+                        "Return ONLY valid JSON: {\"intent\": \"<INTENT_NAME>\", \"topic\": \"extracted topic\"}"
                     ),
                 },
                 {"role": "user", "content": question},

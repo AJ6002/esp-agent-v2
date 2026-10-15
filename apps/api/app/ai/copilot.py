@@ -530,6 +530,7 @@ def ask(
         get_self_fleet_scope,
         get_self_tasks,
         get_self_limitations,
+        get_ui_navigation_narrative,
     )
     from app.schemas.esp_diagnosis import DiagnoseEventRequest, ESPIntentEnum
 
@@ -1123,6 +1124,38 @@ def ask(
             )
         except Exception as e:
             logger.warning(f"Self-limitations dispatch failed: {e}")
+
+    # 3.9 UI Navigation & Platform Route Intelligence (Domain 9)
+    if route.intent == ESPIntentEnum.UI_NAVIGATION:
+        try:
+            ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
+            event_id = ev_match.group(1) if ev_match else None
+            nav_res = get_ui_navigation_narrative(question, entity=route.entity, event_id=event_id)
+            citations = [
+                Citation(
+                    source_type="platform_ui_map_guide",
+                    source_id=1,
+                    title=f"Platform Navigation Guide: {nav_res.title}",
+                    excerpt=nav_res.summary[:280] if nav_res.summary else "ADVAIT ESP APM Navigation Guide",
+                    relevance_score=1.0,
+                    url=nav_res.resolved_path,
+                )
+            ]
+            record_ai_interaction(
+                db, user_id, "esp_ui_navigation", question, nav_res.markdown_report, False, llm_client.model, 0
+            )
+            return AskResult(
+                answer=nav_res.markdown_report,
+                confidence=0.99,
+                citations=citations,
+                warnings=[],
+                needs_clarification=False,
+                suggested_options=nav_res.suggested_options,
+                is_mock=False,
+                structured_data=nav_res.dict(),
+            )
+        except Exception as e:
+            logger.warning(f"UI navigation dispatch failed: {e}")
 
     # 4. Well Failure History (with Temporal Window Filter, Gap 2)
     if route.intent == ESPIntentEnum.WELL_HISTORY and route.entity:
