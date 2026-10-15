@@ -1,0 +1,2035 @@
+====================================================================================================
+ADVAIT ESP APM COPILOT: COMPREHENSIVE FULL REGRESSION AUDIT REPORT
+Execution Date/Time: 2026-10-14 19:48:54 UTC
+Target Environment: Live FastAPI Backend (:8000), Local Qwen 2.5 3B (Server 188), PostgreSQL 184
+Total Queries Evaluated: 70
+====================================================================================================
+
+SUMMARY SCORECARD TABLE:
+----------------------------------------------------------------------------------------------------
+#    | ID        | Status | Latency  | Domain                   | Query
+----------------------------------------------------------------------------------------------------
+01   | XAI-01    | PASS   | 4659 ms | Diagnostic XAI           | "Diagnose event EV-20261012-103435-FNW-001-878"
+02   | XAI-02    | PASS   | 2874 ms | Diagnostic XAI           | "Why did well FS-017 trip?"
+03   | XAI-03    | FAIL   | 20   ms | Diagnostic XAI           | "Diagnose latest shutdown on well FS-040"
+04   | XAI-04    | PASS   | 9009 ms | Diagnostic XAI           | "Show sensor deviations and waveform trends for the trip on FS-017"
+05   | XAI-05    | FAIL   | 35   ms | Diagnostic XAI           | "What is the primary hypothesis and confirmation test for FNW-001 shutdown?"
+06   | XAI-06    | PASS   | 7340 ms | Diagnostic XAI           | "Show failure history of well FS-017 in the last 7 days"
+07   | XAI-07    | PASS   | 3019 ms | Diagnostic XAI           | "Is well FNW-001 healthy? What is its current condition?"
+08   | XAI-08    | PASS   | 518  ms | Diagnostic XAI           | "What is the current health status and operating envelope of FS-004?"
+09   | XAI-09    | PASS   | 1611 ms | Diagnostic XAI           | "What is the current flow rate and water cut of well FS-004?"
+10   | XAI-10    | PASS   | 19   ms | Diagnostic XAI           | "Why did the pump stop?"
+11   | RAG-01    | PASS   | 7865 ms | Petroleum Standards RAG  | "What causes gas locking in an ESP and how to prevent it?"
+12   | RAG-02    | PASS   | 9996 ms | Petroleum Standards RAG  | "How to handle sand production and solids erosion in ESP completions?"
+13   | RAG-03    | PASS   | 9237 ms | Petroleum Standards RAG  | "What causes high current unbalance in ESP motors?"
+14   | RAG-04    | PASS   | 539  ms | Petroleum Standards RAG  | "What are API RP 11S guidelines for motor winding temperature limits?"
+15   | RAG-05    | PASS   | 2156 ms | Work Order Dispatch      | "Create an emergency work order to dispatch maintenance for well FNW-001"
+16   | RAG-06    | PASS   | 4597 ms | Work Order Dispatch      | "Dispatch emergency work order for tripped well FS-017"
+17   | RAG-07    | PASS   | 1110 ms | Chit-Chat & Persona      | "Hello, how are things going today?"
+18   | RAG-08    | PASS   | 1642 ms | Chit-Chat & Persona      | "Good morning assistant, are you ready for surveillance duty?"
+19   | DOM1-01   | PASS   | 10625ms | Domain 1: Surveillance   | "Show total fleet production and deferred oil loss across clusters"
+20   | DOM1-02   | FAIL   | 5493 ms | Domain 1: Surveillance   | "What is the daily gross liquid and net oil production of the fleet?"
+21   | DOM1-03   | PASS   | 8987 ms | Domain 1: Surveillance   | "Fleet triage: rank offline wells by severity and intervention urgency"
+22   | DOM1-04   | PASS   | 5478 ms | Domain 1: Surveillance   | "Which tripped wells require immediate engineering intervention?"
+23   | DOM1-05   | PASS   | 5644 ms | Domain 1: Surveillance   | "Which wells are anomalous right now? Show fleet sub-trip drift"
+24   | DOM1-06   | PASS   | 19728ms | Domain 1: Surveillance   | "Generate morning executive report for the ESP fleet"
+25   | DOM1-07   | PASS   | 5442 ms | Domain 1: Surveillance   | "Show fleet inventory across gathering centers"
+26   | DOM1-08   | PASS   | 146  ms | Domain 1: Surveillance   | "Show fleet alarm timeline for the past 48 hours"
+27   | DOM2-01   | PASS   | 399  ms | Domain 2: Comparison & R | "Compare well FS-017 vs FS-040"
+28   | DOM2-02   | PASS   | 421  ms | Domain 2: Comparison & R | "Compare well FNW-001 vs FS-004"
+29   | DOM2-03   | PASS   | 10965ms | Domain 2: Comparison & R | "Compare Cluster 15 vs Cluster 4"
+30   | DOM2-04   | PASS   | 8226 ms | Domain 2: Comparison & R | "Compare Cluster 3 vs Cluster 15"
+31   | DOM2-05   | PASS   | 24   ms | Domain 2: Comparison & R | "Compare the clusters"
+32   | DOM2-06   | PASS   | 17   ms | Domain 2: Comparison & R | "Compare well FS-017 past 24 hours with last 7 days"
+33   | DOM2-07   | PASS   | 8769 ms | Domain 2: Comparison & R | "Compare well FS-017 against its cluster peers"
+34   | DOM2-08   | PASS   | 675  ms | Domain 2: Comparison & R | "Compare conditions before and after trip for event EV-20261012-101438-FS-017-571"
+35   | DOM2-09   | PASS   | 10350ms | Domain 2: Comparison & R | "Rank fleet by lifetime trips"
+36   | DOM2-10   | PASS   | 10227ms | Domain 2: Comparison & R | "Which wells have the highest vibration?"
+37   | DOM9-01   | PASS   | 4053 ms | Domain 9: UI Navigation  | "what is the Working Status page?"
+38   | DOM9-02   | PASS   | 1750 ms | Domain 9: UI Navigation  | "explain the Working Status screen"
+39   | DOM9-03   | PASS   | 2867 ms | Domain 9: UI Navigation  | "what is the Fleet Cockpit page?"
+40   | DOM9-04   | PASS   | 1644 ms | Domain 9: UI Navigation  | "where is the fleet cockpit?"
+41   | DOM9-05   | PASS   | 1770 ms | Domain 9: UI Navigation  | "what is the Well Monitor screen?"
+42   | DOM9-06   | PASS   | 2561 ms | Domain 9: UI Navigation  | "what is the Live Calculations page?"
+43   | DOM9-07   | PASS   | 1921 ms | Domain 9: UI Navigation  | "what is the Event Intelligence page?"
+44   | DOM9-08   | PASS   | 2267 ms | Domain 9: UI Navigation  | "what is the Reports Hub page?"
+45   | DOM9-09   | PASS   | 2606 ms | Domain 9: UI Navigation  | "what is the Scenario Simulator page?"
+46   | DOM9-10   | PASS   | 5555 ms | Domain 9: UI Navigation  | "show all screens in operations workspace"
+47   | DOM9-11   | PASS   | 1086 ms | Domain 9: UI Navigation  | "where can I find the 2D ESP string visualizer?"
+48   | DOM9-12   | PASS   | 1627 ms | Domain 9: UI Navigation  | "what does the 4-subsystem equalizer display?"
+49   | DOM9-13   | PASS   | 1438 ms | Domain 9: UI Navigation  | "where are live pump performance curves?"
+50   | DOM9-14   | PASS   | 1336 ms | Domain 9: UI Navigation  | "what is the 14-fault classifier spectrum?"
+51   | DOM9-15   | PASS   | 1508 ms | Domain 9: UI Navigation  | "what is virtual flow metering (VFM)?"
+52   | DOM9-16   | PASS   | 2139 ms | Domain 9: UI Navigation  | "where can I find pump curves for FS-017?"
+53   | DOM9-17   | PASS   | 2425 ms | Domain 9: UI Navigation  | "show well detail for FNW-001"
+54   | DOM9-18   | PASS   | 24   ms | Domain 9: UI Navigation  | "where is the pizza ordering screen?"
+55   | DOM10-01  | PASS   | 29   ms | Domain 10: Self-Knowledg | "who are you?"
+56   | DOM10-02  | FAIL   | 1694 ms | Domain 10: Self-Knowledg | "what is your system identity?"
+57   | DOM10-03  | PASS   | 13   ms | Domain 10: Self-Knowledg | "introduce yourself and your background"
+58   | DOM10-04  | FAIL   | 25   ms | Domain 10: Self-Knowledg | "what are your capabilities?"
+59   | DOM10-05  | FAIL   | 29   ms | Domain 10: Self-Knowledg | "what can you do?"
+60   | DOM10-06  | FAIL   | 9668 ms | Domain 10: Self-Knowledg | "list your core features"
+61   | DOM10-07  | FAIL   | 9    ms | Domain 10: Self-Knowledg | "what are your operational boundaries?"
+62   | DOM10-08  | FAIL   | 706  ms | Domain 10: Self-Knowledg | "what can you not do?"
+63   | DOM10-09  | FAIL   | 688  ms | Domain 10: Self-Knowledg | "what is out of scope for you?"
+64   | DOM10-10  | FAIL   | 5460 ms | Domain 10: Self-Knowledg | "what fleet do you monitor?"
+65   | DOM10-11  | FAIL   | 7699 ms | Domain 10: Self-Knowledg | "what assets are under your surveillance?"
+66   | DOM10-12  | PASS   | 20   ms | Domain 10: Self-Knowledg | "what tasks do you support?"
+67   | DOM10-13  | FAIL   | 31   ms | Domain 10: Self-Knowledg | "list supported workflows"
+68   | DOM10-14  | FAIL   | 11   ms | Domain 10: Self-Knowledg | "what are your system limitations?"
+69   | DOM10-15  | FAIL   | 31   ms | Domain 10: Self-Knowledg | "what are your known constraints?"
+70   | DOM10-16  | PASS   | 10351ms | Domain 10: Self-Knowledg | "disclose system limitations"
+----------------------------------------------------------------------------------------------------
+
+AGGREGATE AUDIT METRICS:
+- Total Queries Executed: 70
+- Total Passed / Accurate: 55 (78.6%)
+- Total Failed: 15 (21.4%)
+- Average Latency: 3612 ms
+
+====================================================================================================
+DETAILED PER-QUERY AUDIT TRANSCRIPTS AND RAW OUTPUTS
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+QUERY #01 [XAI-01] - Diagnostic XAI / Trip Diagnosis by Event ID
+Prompt: "Diagnose event EV-20261012-103435-FNW-001-878"
+Status: PASS | Latency: 4659 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Event Root Cause Diagnosis
+
+**Event ID**: `EV-20261012-103435-FNW-001-878` | **Well**: `FNW-001` | **Confidence**: `94%`
+
+### [AI Synthesis] Engineering Evaluation
+The critical failure mechanism identified in the event of the HIGH_VIBRATION trip on FNW-001 is bearing wear. The excessive vibration (2.0g → 4.2783g) and motor current (20.3A → 24.3367A) exceeded the allowable limits, leading to a significant increase in pump intake pressure (400.0 → 366.4251 PSI) and a rapid collapse of the pump discharge pressure (1800.0 → 1856.1 PSI). The motor winding temperature also rose (100.0°C → 117.8277°C), indicating thermal overload. These deviations, coupled with the inflection of three critical signals within 77 seconds, triggered the trip at 2026-10-12 16:04:36 UTC, resulting in the immediate shutdown of the pump to prevent further damage to the bearing and other components.
+
+---
+
+### 1. TRIGGER
+At **2026-10-12 16:04:36 UTC**, well **FNW-001** tripped (`HIGH_VIBRATION`, Severity: **CRITICAL**)
+
+### 2. DEVIATION
+- **Vibration (Vx)**: 2.0 → 4.2783 g (+113.9%, +1.34 g/min) [VIOLATION]
+- **Motor Current**: 20.3 → 24.3367 A (+19.9%, +2.99 A/min) [VIOLATION]
+- **Pump Intake Pressure (PIP)**: 400.0 → 366.4251 PSI (-8.4%, +1794.5 PSI/hr) [ELEVATED]
+- **Pump Discharge Pressure (PDP)**: 1800.0 → 1856.1 PSI (-78.6%, -1458.4 PSI collapse upon trip) [VIOLATION]
+- **Motor Winding Temperature**: 100.0 → 117.8277 °C (+17.8%, +13.2 °C/min) [ELEVATED]
+
+### 3. POINT ANALYSIS
+**3 critical signals co-inflected within 77 seconds** leading to trip at 2026-10-12 16:04:36 UTC:
+- Vibration surged past maximum allowable envelope (2.0g limit → peak 4.2783g)
+- Motor current climbed into overload trip setpoint (115.0% envelope → peak 24.3367A)
+- Pump discharge pressure abruptly collapsed (1856.1 PSI → 397.7 PSI upon shutdown)
+
+```telemetry-trend
+Pre-Trip Waveform Profile (T-120s to T=0s Instant):
+• Vibration (g)  : [ 1.50 ─── 2.57 ─── 2.00 ─── 4.28 ▲ TRIP ] (Limit: 2.00g)
+• Current (A)    : [ 18.3 ─── 20.3 ─── 21.9 ─── 24.3 ▲ OVERLOAD ] (Rated: 20.3A)
+• Intake PIP     : [ 401.4 ─── 381.4 ─── 366.4 PSI ▼ DRAWDOWN ]
+• Discharge PDP  : [ 1856.1 ─── 1763.3 ─── 397.7 PSI ▼ COLLAPSE ]
+```
+
+### 4. SIGNATURE
+- **Pattern**: `bearing_wear_signature`
+- **Fault Taxonomy**: `BEARING_WEAR` — *Bearing Wear*
+- **Authoritative Standard**: ADVAIT ESP PMM Working Draft - Mechanical
+> *"Broken shaft Bearing wear Vibration Misalignment..."*
+
+### 5. RANKED HYPOTHESES
+1. **Bearing Wear** (**90%**) — *Evidence*: Vibration surged to 4.2783g (113.9% of limit); Motor current reached 24.3367A (+19.9% over rated) | *Field Test*: `Inspect drive shaft free rotation with manual turning tool and perform vibration coast-down FFT spectral analysis`
+2. **Stage / Impeller Wear** (**90%**) — *Evidence*: Vibration surged to 4.2783g (113.9% of limit); Motor current reached 24.3367A (+19.9% over rated) | *Field Test*: `Inspect drive shaft free rotation with manual turning tool and perform vibration coast-down FFT spectral analysis`
+3. **Mechanical Overload / Solids Ingestion** (**80%**) — *Evidence*: Motor current surged into overload (24.3367A); Elevated acoustic friction chatter detected | *Field Test*: `Check surface sand desander trap and analyze flowline solids/BS&W sample`
+
+### 6. IMPACT
+- **Deferred Production**: ~**20.8 bbl/hr** deferred while offline
+- **Thermal Margin**: **17.2°C** remaining below motor insulation limit (135.0°C)
+- **Mechanical Margin**: Vibration peak exceeded allowable limit by 113.9%; Motor current exceeded rated capacity by 19.9%
+- **Escalation Threshold**: Escalate to Artificial Lift Superintendent if well remains offline > 4 hours or if shaft rotation resistance is detected during manual check.
+
+### 7. NEXT STEPS
+1. **[SAFETY_LOTO]** SAFETY & LOTO: De-energize and Lockout/Tagout variable speed drive (VSD) and surface switchboard before any mechanical inspection. *(Mandatory Human Sign-off)*
+2. **[ELECTRICAL]** SURFACE ELECTRICAL AUDIT: Measure Phase-to-Phase winding resistance and Phase-to-Ground insulation resistance with 1000V Megger (minimum 10 MΩ threshold). *(Mandatory Human Sign-off)*
+3. **[MECHANICAL]** MECHANICAL ROTATION CHECK: Using approved drive head turning tool, gently rotate shaft manually to verify free rotation and absence of locked impellers. *(Mandatory Human Sign-off)*
+4. **[PROCESS]** HUMAN SIGN-OFF & RESTART GOVERNANCE: Review dynamic fluid level and obtain Petroleum Production Engineer sign-off prior to attempting drive reset or restart sequence. *(Mandatory Human Sign-off)*
+
+---
+> **Engineering Disclaimer**: *AI diagnostic outputs are decision-support recommendations. Maintenance technicians and certified production engineers must perform physical Lockout/Tagout and verify wellhead conditions prior to equipment intervention.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #02 [XAI-02] - Diagnostic XAI / Trip Diagnosis by Well ID
+Prompt: "Why did well FS-017 trip?"
+Status: PASS | Latency: 2874 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Event Root Cause Diagnosis
+
+**Event ID**: `EV-20261012-101438-FS-017-571` | **Well**: `FS-017` | **Confidence**: `94%`
+
+### [AI Synthesis] Engineering Evaluation
+The critical overload and solids ingestion in FS-017 were primarily caused by a significant increase in vibration, motor current, and pump discharge pressure, which led to a rapid collapse of the pump discharge pressure. The high vibration levels exceeded the allowable limit, causing the motor to overheat and potentially ingesting solids, which further exacerbated the overload condition. The rapid escalation of these parameters within a short period of time, resulting in a trip at 2026-10-12 15:44:41 UTC, indicates a mechanical failure mechanism involving both vibration and solids ingestion.
+
+---
+
+### 1. TRIGGER
+At **2026-10-12 15:44:41 UTC**, well **FS-017** tripped (`OVERLOAD_SOLIDS`, Severity: **CRITICAL**)
+
+### 2. DEVIATION
+- **Vibration (Vx)**: 2.0 → 3.4074 g (+70.4%, +1.03 g/min) [VIOLATION]
+- **Motor Current**: 21.0 → 54.9496 A (+161.7%, +16.04 A/min) [VIOLATION]
+- **Pump Intake Pressure (PIP)**: 400.0 → 378.6398 PSI (-5.3%, +508.3 PSI/hr) [ELEVATED]
+- **Pump Discharge Pressure (PDP)**: 1800.0 → 1902.2 PSI (-78.5%, -1494.1 PSI collapse upon trip) [VIOLATION]
+- **Motor Winding Temperature**: 100.0 → 127.6196 °C (+27.6%, +13.0 °C/min) [ELEVATED]
+
+### 3. POINT ANALYSIS
+**4 critical signals co-inflected within 124 seconds** leading to trip at 2026-10-12 15:44:41 UTC:
+- Vibration surged past maximum allowable envelope (2.0g limit → peak 3.4074g)
+- Motor current climbed into overload trip setpoint (125.0% envelope → peak 54.9496A)
+- Pump discharge pressure abruptly collapsed (1902.2 PSI → 408.1 PSI upon shutdown)
+
+```telemetry-trend
+Pre-Trip Waveform Profile (T-120s to T=0s Instant):
+• Vibration (g)  : [ 1.19 ─── 2.04 ─── 2.00 ─── 3.41 ▲ TRIP ] (Limit: 2.00g)
+• Current (A)    : [ 18.9 ─── 21.0 ─── 22.7 ─── 54.9 ▲ OVERLOAD ] (Rated: 21.0A)
+• Intake PIP     : [ 413.6 ─── 393.6 ─── 378.6 PSI ▼ DRAWDOWN ]
+• Discharge PDP  : [ 1902.2 ─── 1807.1 ─── 408.1 PSI ▼ COLLAPSE ]
+```
+
+### 4. SIGNATURE
+- **Pattern**: `overload_solids_signature`
+- **Fault Taxonomy**: `OVERLOAD_SOLIDS` — *Mechanical Overload / Solids Ingestion*
+- **Authoritative Standard**: ADVAIT ESP PMM Working Draft - Example pattern families
+> *"Reduced/no flow + rising PIP + high temperature: blockage, broken shaft or shutdown-at-surface  Erratic amps and pressure with reduced flow: free gas at pump intake.  scenarios.  Reduced flow + elevated amps + reduced discharge pressure: possible stage wear.  Increasing frequency should raise flow,..."*
+
+### 5. RANKED HYPOTHESES
+1. **Mechanical Overload / Solids Ingestion** (**92%**) — *Evidence*: Motor current surged into overload (54.9496A); Elevated acoustic friction chatter detected | *Field Test*: `Check surface sand desander trap and analyze flowline solids/BS&W sample`
+2. **Sand Ingestion** (**92%**) — *Evidence*: Motor current surged into overload (54.9496A); Elevated acoustic friction chatter detected | *Field Test*: `Check surface sand desander trap and analyze flowline solids/BS&W sample`
+3. **Bearing Wear** (**90%**) — *Evidence*: Vibration surged to 3.4074g (70.4% of limit); Motor current reached 54.9496A (+161.7% over rated) | *Field Test*: `Inspect drive shaft free rotation with manual turning tool and perform vibration coast-down FFT spectral analysis`
+
+### 6. IMPACT
+- **Deferred Production**: ~**20.8 bbl/hr** deferred while offline
+- **Thermal Margin**: **7.4°C** remaining below motor insulation limit (135.0°C)
+- **Mechanical Margin**: Vibration peak exceeded allowable limit by 70.4%; Motor current exceeded rated capacity by 161.7%
+- **Escalation Threshold**: Escalate to Artificial Lift Superintendent if well remains offline > 4 hours or if shaft rotation resistance is detected during manual check.
+
+### 7. NEXT STEPS
+1. **[SAFETY_LOTO]** SAFETY & LOTO: De-energize and Lockout/Tagout variable speed drive (VSD) and surface switchboard before any mechanical inspection. *(Mandatory Human Sign-off)*
+2. **[ELECTRICAL]** SURFACE ELECTRICAL AUDIT: Measure Phase-to-Phase winding resistance and Phase-to-Ground insulation resistance with 1000V Megger (minimum 10 MΩ threshold). *(Mandatory Human Sign-off)*
+3. **[MECHANICAL]** MECHANICAL ROTATION CHECK: Using approved drive head turning tool, gently rotate shaft manually to verify free rotation and absence of locked impellers. *(Mandatory Human Sign-off)*
+4. **[PROCESS]** HUMAN SIGN-OFF & RESTART GOVERNANCE: Review dynamic fluid level and obtain Petroleum Production Engineer sign-off prior to attempting drive reset or restart sequence. *(Mandatory Human Sign-off)*
+
+---
+> **Engineering Disclaimer**: *AI diagnostic outputs are decision-support recommendations. Maintenance technicians and certified production engineers must perform physical Lockout/Tagout and verify wellhead conditions prior to equipment intervention.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #03 [XAI-03] - Diagnostic XAI / Event Diagnosis (FS-040)
+Prompt: "Diagnose latest shutdown on well FS-040"
+Status: FAIL | Latency: 20 ms
+FAIL REASON: Verification check failed: Must retrieve and diagnose latest event on FS-040
+Resolved Intent / Route: 10.3 Boundary Declaration
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Operational Boundaries & Safety Constraints
+
+**Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`
+
+| Category | Boundary Restriction | Operational Rationale |
+|---|---|---|
+| **CONTROL** | **No Physical Actuation / Direct SCADA Control** | The Copilot has zero write access to physical Variable Speed Drives (VSDs), switchgear, or wellhead choke valves. Commands to start, stop, or change ESP frequencies are strictly blocked. |
+| **SAFETY** | **Advisory Decision Support Only** | AI-generated diagnoses, failure root causes, and recommended restart procedures require human Production Engineer review and mandatory field sign-off before execution. |
+| **SENSORS** | **Telemetry Instrumentation Boundary** | Surveillance is restricted to downhole and surface electrical, mechanical, and hydraulic sensors. Downhole chemical fluid sampling and fiber-optic acoustic arrays are outside monitored scope. |
+| **INTEGRATION** | **Enterprise ERP Dispatch Boundary** | Work orders are created and staged within the local APM operational database. Direct bi-directional synchronization with external SAP/Maximo ERP systems requires explicit export approval. |
+
+### ⚠️ Physical Actuation Protocol
+If you request pump starts, shutdowns, or VSD frequency modulation, the Copilot will refuse physical execution and provide the authorized standard operating restart procedure (SOP) with safety checklist items instead.
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #04 [XAI-04] - Diagnostic XAI / Telemetry Feature Extraction
+Prompt: "Show sensor deviations and waveform trends for the trip on FS-017"
+Status: PASS | Latency: 9009 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Historical Failure & Reliability Audit: Well `FS-017`
+
+**Source**: PostgreSQL `esp_apm_db` (Server 184) | **Audit Window**: `Full Historical Lifetime` | **Total Logged Events**: `187` | **Confirmed Trips**: `14`
+
+### 1. ASSET SPECIFICATIONS & BASELINE
+- **Well ID**: `FS-017` | **Cluster**: `4`
+- **Motor Rating**: `38.0 HP` (`28.3 kW` electrical equiv.) | **Rated Current**: `21.0 A`
+- **Pump Assembly**: `Multistage Centrifugal ESP (Design BEP: 500 BPD, 282 Stages)`
+- **Protection Envelopes**: Max Vibration `2.0 g` | Overload `125.0%` | Underload `55.0%`
+- **P50 Baselines**: PIP `400.0 PSI` | PDP `1800.0 PSI`
+
+### 2. HISTORICAL FAILURE SPECTRUM
+- **MOTOR_OVERLOAD**: 4 occurrence(s)
+- **UNDERLOAD_PUMP_OFF**: 3 occurrence(s)
+- **HIGH_VIBRATION**: 2 occurrence(s)
+- **UNDER_VOLTAGE**: 2 occurrence(s)
+- **PHASE_IMBALANCE**: 2 occurrence(s)
+- **OVERLOAD_SOLIDS**: 1 occurrence(s)
+
+### 3. RECENT CRITICAL TRIPS & SCENARIOS
+- [2026-10-12 15:44 UTC] Event `EV-20261012-101438-FS-017-571`: **OVERLOAD_SOLIDS** (Severity: CRITICAL) — Scenario: `sand_ingestion`
+- [2026-10-11 22:01 UTC] Event `EV-20261011-163129-FS-017-979`: **MOTOR_OVERLOAD** (Severity: CRITICAL) — Scenario: `motor_overload`
+- [2026-10-11 21:57 UTC] Event `EV-20261011-162730-FS-017-618`: **MOTOR_OVERLOAD** (Severity: CRITICAL) — Scenario: `motor_overload`
+- [2026-10-11 21:45 UTC] Event `EV-20261011-161537-FS-017-108`: **PHASE_IMBALANCE** (Severity: CRITICAL) — Scenario: `phase_imbalance`
+- [2026-10-11 21:41 UTC] Event `EV-20261011-161127-FS-017-456`: **PHASE_IMBALANCE** (Severity: CRITICAL) — Scenario: `phase_imbalance`
+- [2026-10-11 21:29 UTC] Event `EV-20261011-155908-FS-017-447`: **UNDER_VOLTAGE** (Severity: CRITICAL) — Scenario: `undervoltage`
+
+### 4. LOGGED INCIDENTS IN REPOSITORY
+- Incident `INC-20261012-101438-FS-017-571`: **OVERLOAD_SOLIDS** (Severity: CRITICAL), Started: `2026-10-12T10:14:41.363861Z`, Duration: Active / Ongoing (Open Incident)
+- Incident `INC-20261011-163129-FS-017-979`: **MOTOR_OVERLOAD** (Severity: CRITICAL), Started: `2026-10-11T16:31:29.365527Z`, Duration: 14s
+- Incident `INC-20261011-162730-FS-017-618`: **MOTOR_OVERLOAD** (Severity: CRITICAL), Started: `2026-10-11T16:27:30.364291Z`, Duration: 13s
+- Incident `INC-20261011-161537-FS-017-108`: **PHASE_IMBALANCE** (Severity: CRITICAL), Started: `2026-10-11T16:15:35.363717Z`, Duration: 12s
+- Incident `INC-20261011-161127-FS-017-456`: **PHASE_IMBALANCE** (Severity: CRITICAL), Started: `2026-10-11T16:11:27.363879Z`, Duration: 16s
+
+### 5. AI RELIABILITY & RECURRENCE ANALYSIS (Qwen 2.5 Coder 3B)
+**Recurring Failure Patterns and Verified Root Cause Mechanisms:**
+
+1. **Motor Overload and Phase Imbalance**: These failures are closely linked and often co-occur. Motor overload is primarily caused by mechanical friction, high viscosity, or solids/sand ingestion, while phase imbalance is typically due to electrical under-voltage or phase misalignment. These issues can lead to increased current draw and mechanical stress, resulting in motor overloading.
+
+2. **Underload and High Vibration**: Underload trips are often associated with gas lock or gas interference, which reduces fluid density and pump load. High vibration is a common symptom of these issues, as it can cause mechanical stress and wear on the pump components. Gas lock can also lead to undercurrent trips, as the pump is unable to draw sufficient fluid to maintain its design flow rate.
+
+3. **Overload Solids**: This specific failure mode is rare but can occur when sand or other solids enter the pump, causing increased friction and mechanical stress. This can lead to motor overloading and potentially cause the pump to shut down.
+
+**High-Priority Preventative Engineering Maintenance Specific to the Observed Failure Modes:**
+
+1. **Gas Lock Prevention**: Regularly monitor and adjust the wellhead pressure to prevent gas lock. This can be achieved by adjusting the wellhead pressure control system or by using gas lift systems to maintain a stable fluid flow.
+
+2. **Mechanical Friction Reduction**: Implement measures to reduce mechanical friction, such as using lubricants or optimizing pump design to minimize wear and tear. This may include regular maintenance of pump components and ensuring proper alignment of the pump shaft.
+
+3. **Electrical Under-voltage and Phase Misalignment**: Address electrical issues by ensuring proper grounding and wiring. Regularly test and calibrate the electrical system to ensure it is functioning correctly. Implementing a phase imbalance monitoring system can help detect and address issues early.
+
+4. **Sand Ingestion Prevention**: Regularly inspect and clean the wellbore to prevent sand from entering the pump. This may include using sand control systems or implementing a sand trap to filter out sand before it reaches the pump.
+
+5. **Mechanical Stress Mitigation**: Implement measures to mitigate mechanical stress, such as using shock
+
+### 6. TARGETED PREVENTATIVE ENGINEERING ACTIONS
+1. **Mechanical & Vibration Integrity**: Perform FFT spectral coast-down analysis, verify bearing lubrication limits, and check shaft radial runout.
+2. **Solids & Mechanical Load Management**: Inspect surface sand desanders, verify BS&W solids cut, and check motor winding phase resistance balance.
+3. **Hydraulic Inflow Optimization**: Perform acoustic echometer fluid level sounding to verify dynamic intake submergence; adjust casing head gas venting.
+4. **Electrical Power Quality Audit**: Inspect variable speed drive (VSD) harmonic filters, verify surface transformer phase symmetry, and measure cable insulation (megger).
+---
+> **Notice**: *Data verified against PostgreSQL Server 184 tables (`events`, `incidents`, `asset_registry`).*
+
+----------------------------------------------------------------------------------------------------
+QUERY #05 [XAI-05] - Diagnostic XAI / Hypothesis & Confidence Scoring
+Prompt: "What is the primary hypothesis and confirmation test for FNW-001 shutdown?"
+Status: FAIL | Latency: 35 ms
+FAIL REASON: Verification check failed: Must provide ranked hypotheses with confirmation tests
+Resolved Intent / Route: 10.3 Boundary Declaration
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Operational Boundaries & Safety Constraints
+
+**Safety Contract**: `READ_ONLY_DECISION_SUPPORT` | **Physical Control Access**: `NONE (BLOCKED)`
+
+| Category | Boundary Restriction | Operational Rationale |
+|---|---|---|
+| **CONTROL** | **No Physical Actuation / Direct SCADA Control** | The Copilot has zero write access to physical Variable Speed Drives (VSDs), switchgear, or wellhead choke valves. Commands to start, stop, or change ESP frequencies are strictly blocked. |
+| **SAFETY** | **Advisory Decision Support Only** | AI-generated diagnoses, failure root causes, and recommended restart procedures require human Production Engineer review and mandatory field sign-off before execution. |
+| **SENSORS** | **Telemetry Instrumentation Boundary** | Surveillance is restricted to downhole and surface electrical, mechanical, and hydraulic sensors. Downhole chemical fluid sampling and fiber-optic acoustic arrays are outside monitored scope. |
+| **INTEGRATION** | **Enterprise ERP Dispatch Boundary** | Work orders are created and staged within the local APM operational database. Direct bi-directional synchronization with external SAP/Maximo ERP systems requires explicit export approval. |
+
+### ⚠️ Physical Actuation Protocol
+If you request pump starts, shutdowns, or VSD frequency modulation, the Copilot will refuse physical execution and provide the authorized standard operating restart procedure (SOP) with safety checklist items instead.
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #06 [XAI-06] - Diagnostic XAI / Temporal Failure History (7 Days)
+Prompt: "Show failure history of well FS-017 in the last 7 days"
+Status: PASS | Latency: 7340 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Historical Failure & Reliability Audit: Well `FS-017`
+
+**Source**: PostgreSQL `esp_apm_db` (Server 184) | **Audit Window**: `Last 7 Days (2026-10-05 to 2026-10-12)` | **Total Logged Events**: `187` | **Confirmed Trips**: `14`
+
+### 1. ASSET SPECIFICATIONS & BASELINE
+- **Well ID**: `FS-017` | **Cluster**: `4`
+- **Motor Rating**: `38.0 HP` (`28.3 kW` electrical equiv.) | **Rated Current**: `21.0 A`
+- **Pump Assembly**: `Multistage Centrifugal ESP (Design BEP: 500 BPD, 282 Stages)`
+- **Protection Envelopes**: Max Vibration `2.0 g` | Overload `125.0%` | Underload `55.0%`
+- **P50 Baselines**: PIP `400.0 PSI` | PDP `1800.0 PSI`
+
+### 2. HISTORICAL FAILURE SPECTRUM
+- **MOTOR_OVERLOAD**: 4 occurrence(s)
+- **UNDERLOAD_PUMP_OFF**: 3 occurrence(s)
+- **HIGH_VIBRATION**: 2 occurrence(s)
+- **UNDER_VOLTAGE**: 2 occurrence(s)
+- **PHASE_IMBALANCE**: 2 occurrence(s)
+- **OVERLOAD_SOLIDS**: 1 occurrence(s)
+
+### 3. RECENT CRITICAL TRIPS & SCENARIOS
+- [2026-10-12 15:44 UTC] Event `EV-20261012-101438-FS-017-571`: **OVERLOAD_SOLIDS** (Severity: CRITICAL) — Scenario: `sand_ingestion`
+- [2026-10-11 22:01 UTC] Event `EV-20261011-163129-FS-017-979`: **MOTOR_OVERLOAD** (Severity: CRITICAL) — Scenario: `motor_overload`
+- [2026-10-11 21:57 UTC] Event `EV-20261011-162730-FS-017-618`: **MOTOR_OVERLOAD** (Severity: CRITICAL) — Scenario: `motor_overload`
+- [2026-10-11 21:45 UTC] Event `EV-20261011-161537-FS-017-108`: **PHASE_IMBALANCE** (Severity: CRITICAL) — Scenario: `phase_imbalance`
+- [2026-10-11 21:41 UTC] Event `EV-20261011-161127-FS-017-456`: **PHASE_IMBALANCE** (Severity: CRITICAL) — Scenario: `phase_imbalance`
+- [2026-10-11 21:29 UTC] Event `EV-20261011-155908-FS-017-447`: **UNDER_VOLTAGE** (Severity: CRITICAL) — Scenario: `undervoltage`
+
+### 4. LOGGED INCIDENTS IN REPOSITORY
+- Incident `INC-20261012-101438-FS-017-571`: **OVERLOAD_SOLIDS** (Severity: CRITICAL), Started: `2026-10-12T10:14:41.363861Z`, Duration: Active / Ongoing (Open Incident)
+- Incident `INC-20261011-163129-FS-017-979`: **MOTOR_OVERLOAD** (Severity: CRITICAL), Started: `2026-10-11T16:31:29.365527Z`, Duration: 14s
+- Incident `INC-20261011-162730-FS-017-618`: **MOTOR_OVERLOAD** (Severity: CRITICAL), Started: `2026-10-11T16:27:30.364291Z`, Duration: 13s
+- Incident `INC-20261011-161537-FS-017-108`: **PHASE_IMBALANCE** (Severity: CRITICAL), Started: `2026-10-11T16:15:35.363717Z`, Duration: 12s
+- Incident `INC-20261011-161127-FS-017-456`: **PHASE_IMBALANCE** (Severity: CRITICAL), Started: `2026-10-11T16:11:27.363879Z`, Duration: 16s
+
+### 5. AI RELIABILITY & RECURRENCE ANALYSIS (Qwen 2.5 Coder 3B)
+**Recurring Failure Patterns and Verified Root Cause Mechanisms:**
+
+1. **MOTOR_OVERLOAD**: This failure mode is primarily attributed to mechanical friction, high viscosity, and solids/sand ingestion. The high viscosity of the fluid in the well can lead to increased friction, causing the motor to overheat and overload. Additionally, sand ingestion can cause mechanical wear on the motor, further contributing to overload.
+
+2. **UNDERLOAD_PUMP_OFF**: This failure mode is often caused by gas lock or gas interference, which reduces the fluid density and pump load, leading to undercurrent trips. This can be mitigated by ensuring proper gas management and using gas lift systems to maintain stable fluid conditions.
+
+3. **PHASE_IMBALANCE**: Phase imbalance is a common cause of motor overload, particularly in wells with multiple phases. This can be addressed by ensuring proper phase balance and using phase correction equipment if necessary.
+
+4. **UNDER_VOLTAGE**: Under-voltage can cause motor overload, especially in wells with low voltage conditions. This can be mitigated by ensuring proper voltage regulation and using voltage stabilizers if necessary.
+
+**High-Priority Preventative Engineering Maintenance Specific to the Observed Failure Modes:**
+
+1. **MOTOR OVERLOAD**: Implement regular maintenance checks for the motor, including lubrication and inspection of mechanical components. Consider using advanced lubricants and implementing monitoring systems to detect early signs of wear.
+
+2. **UNDERLOAD_PUMP_OFF**: Implement gas management systems to maintain stable fluid conditions. This may include using gas lift systems or adjusting gas injection rates to prevent gas lock.
+
+3. **PHASE_IMBALANCE**: Regularly inspect and adjust phase balance in the well. Consider using phase correction equipment to ensure proper phase balance.
+
+4. **UNDER_VOLTAGE**: Implement voltage regulation systems to maintain stable voltage conditions. This may include using voltage stabilizers or adjusting power supply settings to prevent under-voltage.
+
+### 6. TARGETED PREVENTATIVE ENGINEERING ACTIONS
+1. **Mechanical & Vibration Integrity**: Perform FFT spectral coast-down analysis, verify bearing lubrication limits, and check shaft radial runout.
+2. **Solids & Mechanical Load Management**: Inspect surface sand desanders, verify BS&W solids cut, and check motor winding phase resistance balance.
+3. **Hydraulic Inflow Optimization**: Perform acoustic echometer fluid level sounding to verify dynamic intake submergence; adjust casing head gas venting.
+4. **Electrical Power Quality Audit**: Inspect variable speed drive (VSD) harmonic filters, verify surface transformer phase symmetry, and measure cable insulation (megger).
+---
+> **Notice**: *Data verified against PostgreSQL Server 184 tables (`events`, `incidents`, `asset_registry`).*
+
+----------------------------------------------------------------------------------------------------
+QUERY #07 [XAI-07] - Diagnostic XAI / Well Health Assessment
+Prompt: "Is well FNW-001 healthy? What is its current condition?"
+Status: PASS | Latency: 3019 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Well Health Assessment: `FNW-001`
+
+**Health Index**: `60.0%` | **Operating State**: `STOPPED` | **Last Telemetry**: `2026-10-15 01:19:17 UTC`
+
+### 1. PHYSICAL ENVELOPE AUDIT
+- **Motor Current**: `0.0 A` / Rated `20.3 A` (**NORMAL**)
+- **Vibration**: `0.18 g` / Allowable Limit `2.0 g` (**NORMAL**)
+- **Intake Pressure (PIP)**: `397.2 PSI` (Warning threshold: `150.0 PSI`)
+- **Discharge Pressure (PDP)**: `399.3 PSI`
+- **Motor Temperature**: `85.2 °C` / Trip Limit `135.0 °C`
+
+### 2. DETECTED RISKS & CONDITIONS
+- **ALERT**: Well is in 'STOPPED' state. Production is currently halted.
+
+### 3. AI OPERATIONAL RECOMMENDATION (Qwen 2.5 Coder 3B)
+The operational assessment for Well ID FNW-001 indicates a health index of 60.0%, which suggests a moderate level of operational health. The current current of 0.0 A, while below the rated 20.3 A, is within the normal range. The vibration level of 0.18 g is also within the acceptable limit of 2.0 g. However, the well is currently in a 'STOPPED' state, which is an immediate concern. The production is halted, and there are no active alarms. Immediate recommended technician action should be to investigate the cause of the well's stoppage and ensure that all necessary maintenance and repairs are completed to restore production.
+
+---
+> **Notice**: *Evaluated against calibrated P50 baselines and protection limits in Server 184 PostgreSQL.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #08 [XAI-08] - Diagnostic XAI / Well Health Assessment (FS-004)
+Prompt: "What is the current health status and operating envelope of FS-004?"
+Status: PASS | Latency: 518 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Recommended Operating Range (ROR)
+
+**Route Path**: `/wells/FS-004` | **Type**: `Concept` | **Source**: `[route.well_detail]`
+
+That's not documented in the platform guide yet.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-004]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #09 [XAI-09] - Diagnostic XAI / Well Production Metrics
+Prompt: "What is the current flow rate and water cut of well FS-004?"
+Status: PASS | Latency: 1611 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Production Telemetry Summary: Well `FS-004`
+
+**Operating State**: `RUNNING` | **Source**: `opg_well_telemetry` (Server 184)
+
+### 1. PRODUCTION RATES
+- **Current Total Liquid Rate**: `2056.2 BPD`
+- **Water Cut (BS&W)**: `78.1%`
+- **Net Oil Rate**: `449.3 BOPD`
+- **Historical Producing Average (Running State)**: `993.5 BPD` (218.6 BOPD net oil)
+
+### 2. HYDRAULIC PRESSURE OPERATING CONDITIONS
+- **Pump Intake Pressure (PIP)**: `389.2 PSI`
+- **Pump Discharge Pressure (PDP)**: `1886.0 PSI`
+- **Differential Head Developed**: `1496.8 PSI`
+
+---
+> *Production metrics calculated from verified downhole and surface sensor streams.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #10 [XAI-10] - Diagnostic XAI / HITL Operational Clarification
+Prompt: "Why did the pump stop?"
+Status: PASS | Latency: 19 ms
+
+FULL RESPONSE OUTPUT:
+### [ESP APM] Operational Clarification Required
+
+Which well or event would you like to inspect?
+
+Select an option below or refine your query directly:
+
+----------------------------------------------------------------------------------------------------
+QUERY #11 [RAG-01] - Petroleum Standards RAG / Gas Locking Prevention
+Prompt: "What causes gas locking in an ESP and how to prevent it?"
+Status: PASS | Latency: 7865 ms
+
+FULL RESPONSE OUTPUT:
+Gas locking in an ESP occurs when gas accumulates in the pump, causing the pump to stop or stall. This can happen due to several reasons, including insufficient fluid levels in the well, high pump speed, or poor gas separation efficiency. To prevent gas locking, the following steps can be taken:
+
+1. Adjust pump speed to prevent gas locking: If the pump speed is too high, it can cause gas to accumulate in the pump. To prevent this, the pump speed should be adjusted to a lower value.
+
+2. Install gas separation equipment: Gas separation equipment can be installed to remove gas from the well before it reaches the pump. This can help prevent gas from accumulating in the pump and causing it to stop or stall.
+
+3. Check gas separator efficiency: The efficiency of the gas separator should be checked regularly to ensure that it is working properly. If the gas separator is not working properly, it can cause gas to accumulate in the pump and cause it to stop or stall.
+
+4. Adjust fluid levels: If the fluid levels in the well are insufficient, it can cause gas to accumulate in the pump. To prevent this, the fluid levels should be adjusted to a higher value.
+
+5. Monitor pump performance: Regular monitoring of pump performance can help identify gas locking early and prevent it from causing significant damage to the pump or well.
+
+----------------------------------------------------------------------------------------------------
+QUERY #12 [RAG-02] - Petroleum Standards RAG / Sand Management Guidelines
+Prompt: "How to handle sand production and solids erosion in ESP completions?"
+Status: PASS | Latency: 9996 ms
+
+FULL RESPONSE OUTPUT:
+Handling sand production and solids erosion in ESP completions is crucial for maintaining the efficiency and longevity of the pump system. Here are the steps to address these issues:
+
+1. **Sand Control**: Implement effective sand control measures to prevent sand from entering the pump intake. This can be achieved by using sand traps, filters, and screens at the pump intake. Sand traps help catch large particles, while filters and screens filter out smaller particles. Regular maintenance of these components is essential to ensure they remain effective.
+
+2. **Pump Selection**: Choose a pump with the appropriate specifications to handle the expected sand production. Pumps designed for high sand content should be selected to ensure they can withstand the abrasive wear caused by sand particles. This includes considering pump impeller design, material, and durability.
+
+3. **Fluid Compatibility**: Ensure that the well fluid is compatible with the materials used in the ESP system. Some well fluids may contain corrosive elements or substances that can degrade the pump components. Regular monitoring of fluid quality and pH levels is necessary to prevent corrosion.
+
+4. **Regular Maintenance**: Conduct regular maintenance checks on the ESP system to detect and address any issues early. This includes checking the motor current, vibration levels, and intake pressure. If any of these parameters exceed normal operating limits, it may indicate a problem with sand production or solids erosion.
+
+5. **Fluid Flushes**: If allowed, flush the well with clean fluid to remove any accumulated sand or solids from the pump intake. This can help prevent further damage to the pump components and improve performance.
+
+6. **Material Selection**: Select materials that are resistant to corrosion and abrasion. This includes using materials such as stainless steel, bronze, or other corrosion-resistant alloys for pump components.
+
+7. **Se
+
+----------------------------------------------------------------------------------------------------
+QUERY #13 [RAG-03] - Petroleum Standards RAG / Electrical Current Unbalance
+Prompt: "What causes high current unbalance in ESP motors?"
+Status: PASS | Latency: 9237 ms
+
+FULL RESPONSE OUTPUT:
+High current unbalance in ESP motors can be caused by several factors, including:
+
+1. Uneven load distribution: If the load on the motor is not evenly distributed, it can cause unbalanced current to flow through the motor windings. This can lead to increased motor temperature and potential damage to the motor.
+
+2. Faulty bearings: Faulty bearings can cause unbalanced current to flow through the motor windings. This can be caused by worn or damaged bearings, which can cause the motor to rotate unevenly.
+
+3. Loose connections: Loose connections between the motor and its components can cause unbalanced current to flow through the motor windings. This can be caused by loose wiring, loose mounting bolts, or loose bearings.
+
+4. Improper motor installation: Improper motor installation can cause unbalanced current to flow through the motor windings. This can be caused by improper mounting, improper alignment, or improper grounding.
+
+5. Electrical interference: Electrical interference can cause unbalanced current to flow through the motor windings. This can be caused by nearby electrical equipment, such as transformers or other motors, or by external sources, such as lightning or radio waves.
+
+To diagnose and correct high current unbalance in ESP motors, the following steps can be taken:
+
+1. Check the load distribution: Verify that the load on the motor is evenly distributed. If the load is not evenly distributed, consider redistributing the load or using a load balancer.
+
+2. Inspect the bearings: Check the bearings for wear or damage. If the bearings are worn or damaged, consider replacing them.
+
+3. Inspect the connections: Check the connections between the motor and its components for looseness. If the connections are loose, tighten them.
+
+4. Inspect
+
+----------------------------------------------------------------------------------------------------
+QUERY #14 [RAG-04] - Petroleum Standards RAG / Thermal Limits & Insulation
+Prompt: "What are API RP 11S guidelines for motor winding temperature limits?"
+Status: PASS | Latency: 539 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] ESP 2D String Visualizer
+
+**Route Path**: `/wells/FS-017` | **Type**: `Component` | **Source**: `[route.well_detail]`
+
+That's not documented in the platform guide yet.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #15 [RAG-05] - Work Order Dispatch / Emergency Dispatch with LOTO
+Prompt: "Create an emergency work order to dispatch maintenance for well FNW-001"
+Status: PASS | Latency: 2156 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Work Order Successfully Dispatched
+
+**Work Order Code**: `WO-2026-96057CED4E1A406BB621B45048D75498` | **Work Order ID**: `#46`
+
+### Work Order Details
+- **Target Asset**: Well `FNW-001`
+- **Priority**: `P1 - Critical Emergency Dispatch`
+- **Status**: `pending_dispatch` (Pending Supervisor Assignment)
+- **Primary Root Cause**: `Bearing Wear`
+- **Associated Event**: `EV-20261012-103435-FNW-001-878`
+
+### Mandatory Safety & LOTO Governance
+> **Safety Alert**: *MANDATORY LOTO & ELECTRICAL ISOLATION: De-energize Variable Speed Drive (VSD) and surface switchgear; verify zero-voltage state with calibrated multimeter. Depressurize wellhead flowlines before inspection.*
+
+### Assigned Checklist (8 Steps):
+1. **[SAFETY]** MANDATORY LOTO: De-energize and Lockout/Tagout VSD surface switchboard and main feeder *(Mandatory)*
+2. **[SAFETY]** ZERO-ENERGY VERIFICATION: Test all incoming and motor leads with 1000V calibrated multimeter *(Mandatory)*
+3. **[SAFETY]** HYDRAULIC ISOLATION: Close wing valve, master valve, and dissipate wellhead flowline trapped pressure *(Mandatory)*
+4. **[DIAGNOSIS]** VSD FAULT LOG AUDIT: Extract VSD memory fault codes and trip event logs for FNW-001 *(Mandatory)*
+5. **[REPAIR]** ELECTRICAL MEGGER TEST: Measure Phase-to-Phase and Phase-to-Ground resistance (min 10 MΩ) *(Mandatory)*
+6. **[REPAIR]** MECHANICAL FREE ROTATION: Rotate shaft with drive turning tool; verify zero drag or impeller seizure *(Mandatory)*
+7. **[REPAIR]** WELLHEAD INTEGRITY: Inspect surface sand desander trap and measure BS&W solids cut
+8. **[TESTING]** PRE-RESTART SIGN-OFF: Review echometer fluid level and obtain Petroleum Production Engineer sign-off *(Mandatory)*
+
+---
+*The work order has been created in the local maintenance database and queued for execution.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #16 [RAG-06] - Work Order Dispatch / Dispatch for FS-017
+Prompt: "Dispatch emergency work order for tripped well FS-017"
+Status: PASS | Latency: 4597 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Work Order Successfully Dispatched
+
+**Work Order Code**: `WO-2026-E6AB38E307DF4D9BA2E5290CAA37EFB9` | **Work Order ID**: `#47`
+
+### Work Order Details
+- **Target Asset**: Well `FS-017`
+- **Priority**: `P1 - Critical Emergency Dispatch`
+- **Status**: `pending_dispatch` (Pending Supervisor Assignment)
+- **Primary Root Cause**: `Mechanical Overload / Solids Ingestion`
+- **Associated Event**: `EV-20261012-101438-FS-017-571`
+
+### Mandatory Safety & LOTO Governance
+> **Safety Alert**: *MANDATORY LOTO & ELECTRICAL ISOLATION: De-energize Variable Speed Drive (VSD) and surface switchgear; verify zero-voltage state with calibrated multimeter. Depressurize wellhead flowlines before inspection.*
+
+### Assigned Checklist (8 Steps):
+1. **[SAFETY]** MANDATORY LOTO: De-energize and Lockout/Tagout VSD surface switchboard and main feeder *(Mandatory)*
+2. **[SAFETY]** ZERO-ENERGY VERIFICATION: Test all incoming and motor leads with 1000V calibrated multimeter *(Mandatory)*
+3. **[SAFETY]** HYDRAULIC ISOLATION: Close wing valve, master valve, and dissipate wellhead flowline trapped pressure *(Mandatory)*
+4. **[DIAGNOSIS]** VSD FAULT LOG AUDIT: Extract VSD memory fault codes and trip event logs for FS-017 *(Mandatory)*
+5. **[REPAIR]** ELECTRICAL MEGGER TEST: Measure Phase-to-Phase and Phase-to-Ground resistance (min 10 MΩ) *(Mandatory)*
+6. **[REPAIR]** MECHANICAL FREE ROTATION: Rotate shaft with drive turning tool; verify zero drag or impeller seizure *(Mandatory)*
+7. **[REPAIR]** WELLHEAD INTEGRITY: Inspect surface sand desander trap and measure BS&W solids cut
+8. **[TESTING]** PRE-RESTART SIGN-OFF: Review echometer fluid level and obtain Petroleum Production Engineer sign-off *(Mandatory)*
+
+---
+*The work order has been created in the local maintenance database and queued for execution.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #17 [RAG-07] - Chit-Chat & Persona / Conversational Greeting
+Prompt: "Hello, how are things going today?"
+Status: PASS | Latency: 1110 ms
+
+FULL RESPONSE OUTPUT:
+Hello! I'm here to help you with your ESP diagnostics, trip root cause analysis, fleet health surveillance, and petroleum engineering standards. How can I assist you today?
+
+----------------------------------------------------------------------------------------------------
+QUERY #18 [RAG-08] - Chit-Chat & Persona / Operational Greeting
+Prompt: "Good morning assistant, are you ready for surveillance duty?"
+Status: PASS | Latency: 1642 ms
+
+FULL RESPONSE OUTPUT:
+Good morning! Yes, I'm ready to assist with well diagnostics, fleet status, or engineering standards. How can I help you today?
+
+----------------------------------------------------------------------------------------------------
+QUERY #19 [DOM1-01] - Domain 1: Surveillance / Fleet Production & Deferment
+Prompt: "Show total fleet production and deferred oil loss across clusters"
+Status: PASS | Latency: 10625 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Production & Deferment Summary
+
+**Fleet Availability**: `40.0%` (4/10 Online) | **Production Efficiency**: `68.1%`
+
+### 1. AGGREGATE FLEET OUTPUT
+- **Current Active Gross Liquid**: **`7201.7 BPD`**
+- **Current Net Oil Produced**: **`1581.5 BOPD`** (Weighted BS&W: `77.9%`)
+- **Deferred Production Loss (Offline Assets)**: **`742.8 BOPD`** (3376.3 Gross BPD)
+- **Total Fleet Production Capacity**: `10578.0 BPD` (2324.3 BOPD potential)
+
+### 2. CLUSTER PRODUCTION BREAKDOWN
+| Gathering Cluster | Active Ratio | Gross Liquid | Net Oil |
+|---|---|---|---|
+| Cluster `15` | `1/2` | `3828.0 BPD` | `833.8 BOPD` |
+| Cluster `3` | `2/3` | `2873.8 BPD` | `637.3 BOPD` |
+| Cluster `4` | `1/5` | `499.9 BPD` | `110.4 BOPD` |
+
+---
+> *Calculated from live SCADA telemetry and calibrated historical running averages in Server 184.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #20 [DOM1-02] - Domain 1: Surveillance / Fleet Production Summary
+Prompt: "What is the daily gross liquid and net oil production of the fleet?"
+Status: FAIL | Latency: 5493 ms
+FAIL REASON: Verification check failed: Must report fleet daily production volumes
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Real-Time Operational Status & Health Summary
+
+**Source**: PostgreSQL Live SCADA (`opg_well_telemetry`) + Trip Forensics (`events`) + Asset Registry (`asset_registry`) on Server 184
+
+### 1. LIVE FLEET OPERATIONAL STATE BREAKDOWN
+- **Currently Running / Producing**: **`4 Wells`** (40.0% of live monitored assets)
+- **Currently Tripped / Stopped**: **`6 Wells`** (60.0% downtime / offline rate)
+- **Unmonitored / Standby in SCADA**: **`0 Wells`** (Configured in asset registry; no active live SCADA stream)
+- **Total Registered Assets**: `10 Wells` across fields `FNW`, `FS`, `FWS`
+
+### 2. CURRENTLY TRIPPED WELLS & FORENSIC ROOT CAUSES (Action Required)
+| Well ID | Operating State | Primary Trip Cause | Incident Event ID | Severity | Failure Scenario |
+|---|---|---|---|---|---|
+| `FNW-001` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-20261012-103435-FNW-001-878` | `CRITICAL` | bearing_degradation |
+| `FS-013` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-TEST-f6a4b11d` | `CRITICAL` | normal |
+| `FS-016` | `TRIPPED / STOPPED` | **`UNDERLOAD_PUMP_OFF`** | `EV-20261012-071541-FS-016-838` | `CRITICAL` | dry_well_pump_off |
+| `FS-017` | `TRIPPED / STOPPED` | **`OVERLOAD_SOLIDS`** | `EV-20261012-101438-FS-017-571` | `CRITICAL` | sand_ingestion |
+| `FS-040` | `TRIPPED / STOPPED` | **`BROKEN_SHAFT_UNDERLOAD`** | `EV-20261012-101529-FS-040-950` | `CRITICAL` | broken_shaft |
+| `FS-047` | `TRIPPED / STOPPED` | **`MOTOR_OVERLOAD`** | `EV-20261012-103306-FS-047-416` | `CRITICAL` | motor_overload |
+
+### 3. CURRENTLY RUNNING WELLS (Live Nominal Telemetry)
+| Well ID | State | Operating Frequency | Motor Current | Intake Pr. (PIP) | Motor Temp | Vibration |
+|---|---|---|---|---|---|---|
+| `FS-004` | `RUNNING` | 50.0 Hz | 34.8 A | 391.1 psi | 83.8 °C | 0.177 G |
+| `FS-006` | `RUNNING` | 49.9 Hz | 33.0 A | 380.2 psi | 83.2 °C | 0.179 G |
+| `FS-023` | `RUNNING` | 49.9 Hz | 42.3 A | 421.0 psi | 91.5 °C | 0.183 G |
+| `FWS-001` | `RUNNING` | 50.2 Hz | 84.8 A | 420.4 psi | 92.1 °C | 0.189 G |
+
+### 4. OILFIELD HIERARCHY MAPPING (Field → Gathering Station → Cluster)
+**Field-Level Rollup**:
+- **Field `FS`**: `5` wells | `186.0 HP` aggregate capacity
+- **Field `Unassigned Field`**: `3` wells | `263.0 HP` aggregate capacity
+- **Field `FNW`**: `1` wells | `53.0 HP` aggregate capacity
+- **Field `FWS`**: `1` wells | `350.0 HP` aggregate capacity
+
+**Gathering Station / Cluster Allocation**:
+- **Cluster 15**: `2/2` wells active | `403.0 HP` installed power
+- **Cluster 3**: `3/3` wells active | `250.0 HP` installed power
+- **Cluster 4**: `5/5` wells active | `199.0 HP` installed power
+
+----------------------------------------------------------------------------------------------------
+QUERY #21 [DOM1-03] - Domain 1: Surveillance / Fleet Operational Triage
+Prompt: "Fleet triage: rank offline wells by severity and intervention urgency"
+Status: PASS | Latency: 8987 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Operational Triage & Priority Matrix
+
+**Triage Target**: `6 Offline / Abnormal Assets` | **Critical Actions**: `6 P1 Interventions`
+
+### 1. ACTION PRIORITY RANKING (Ranked by Risk & Deferment Impact)
+| Rank | Well ID | Severity | Failure Mode | Deferred Oil | Urgency Protocol |
+|---|---|---|---|---|---|
+| #1 | `FS-040` | `CRITICAL` | `BROKEN_SHAFT_UNDERLOAD` | `176.1 BOPD` | `IMMEDIATE_LOTO` |
+| #2 | `FS-013` | `CRITICAL` | `HIGH_VIBRATION` | `103.2 BOPD` | `IMMEDIATE_LOTO` |
+| #3 | `FS-016` | `CRITICAL` | `UNDERLOAD_PUMP_OFF` | `177.1 BOPD` | `SUPERVISOR_REVIEW` |
+| #4 | `FS-047` | `CRITICAL` | `MOTOR_OVERLOAD` | `109.6 BOPD` | `SUPERVISOR_REVIEW` |
+| #5 | `FNW-001` | `CRITICAL` | `HIGH_VIBRATION` | `67.5 BOPD` | `IMMEDIATE_LOTO` |
+| #6 | `FS-017` | `CRITICAL` | `OVERLOAD_SOLIDS` | `109.3 BOPD` | `SUPERVISOR_REVIEW` |
+
+### 2. DISPATCH GUIDANCE
+- **Priority 1 (IMMEDIATE_LOTO)**: Perform electrical isolation and Megger test before physical rotation attempt.
+- **Priority 2 (SUPERVISOR_REVIEW)**: Review VSD fault log buffer and fluid dynamic level before restart authorization.
+- **Priority 3 (SURVEILLANCE)**: Assets with baseline drift requiring hourly parameter checks.
+
+---
+> *Priority scores synthesized from forensic trip events and production deferment baselines.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #22 [DOM1-04] - Domain 1: Surveillance / Tripped Wells Priority Triage
+Prompt: "Which tripped wells require immediate engineering intervention?"
+Status: PASS | Latency: 5478 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Real-Time Operational Status & Health Summary
+
+**Source**: PostgreSQL Live SCADA (`opg_well_telemetry`) + Trip Forensics (`events`) + Asset Registry (`asset_registry`) on Server 184
+
+### 1. LIVE FLEET OPERATIONAL STATE BREAKDOWN
+- **Currently Running / Producing**: **`4 Wells`** (40.0% of live monitored assets)
+- **Currently Tripped / Stopped**: **`6 Wells`** (60.0% downtime / offline rate)
+- **Unmonitored / Standby in SCADA**: **`0 Wells`** (Configured in asset registry; no active live SCADA stream)
+- **Total Registered Assets**: `10 Wells` across fields `FNW`, `FS`, `FWS`
+
+### 2. CURRENTLY TRIPPED WELLS & FORENSIC ROOT CAUSES (Action Required)
+| Well ID | Operating State | Primary Trip Cause | Incident Event ID | Severity | Failure Scenario |
+|---|---|---|---|---|---|
+| `FNW-001` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-20261012-103435-FNW-001-878` | `CRITICAL` | bearing_degradation |
+| `FS-013` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-TEST-f6a4b11d` | `CRITICAL` | normal |
+| `FS-016` | `TRIPPED / STOPPED` | **`UNDERLOAD_PUMP_OFF`** | `EV-20261012-071541-FS-016-838` | `CRITICAL` | dry_well_pump_off |
+| `FS-017` | `TRIPPED / STOPPED` | **`OVERLOAD_SOLIDS`** | `EV-20261012-101438-FS-017-571` | `CRITICAL` | sand_ingestion |
+| `FS-040` | `TRIPPED / STOPPED` | **`BROKEN_SHAFT_UNDERLOAD`** | `EV-20261012-101529-FS-040-950` | `CRITICAL` | broken_shaft |
+| `FS-047` | `TRIPPED / STOPPED` | **`MOTOR_OVERLOAD`** | `EV-20261012-103306-FS-047-416` | `CRITICAL` | motor_overload |
+
+### 3. CURRENTLY RUNNING WELLS (Live Nominal Telemetry)
+| Well ID | State | Operating Frequency | Motor Current | Intake Pr. (PIP) | Motor Temp | Vibration |
+|---|---|---|---|---|---|---|
+| `FS-004` | `RUNNING` | 50.0 Hz | 34.7 A | 392.8 psi | 83.6 °C | 0.179 G |
+| `FS-006` | `RUNNING` | 49.8 Hz | 32.8 A | 377.2 psi | 83.4 °C | 0.179 G |
+| `FS-023` | `RUNNING` | 50.1 Hz | 41.8 A | 420.0 psi | 91.1 °C | 0.181 G |
+| `FWS-001` | `RUNNING` | 49.9 Hz | 85.4 A | 419.4 psi | 91.9 °C | 0.184 G |
+
+### 4. OILFIELD HIERARCHY MAPPING (Field → Gathering Station → Cluster)
+**Field-Level Rollup**:
+- **Field `FS`**: `5` wells | `186.0 HP` aggregate capacity
+- **Field `Unassigned Field`**: `3` wells | `263.0 HP` aggregate capacity
+- **Field `FNW`**: `1` wells | `53.0 HP` aggregate capacity
+- **Field `FWS`**: `1` wells | `350.0 HP` aggregate capacity
+
+**Gathering Station / Cluster Allocation**:
+- **Cluster 15**: `2/2` wells active | `403.0 HP` installed power
+- **Cluster 3**: `3/3` wells active | `250.0 HP` installed power
+- **Cluster 4**: `5/5` wells active | `199.0 HP` installed power
+
+----------------------------------------------------------------------------------------------------
+QUERY #23 [DOM1-05] - Domain 1: Surveillance / Fleet Anomaly Early Warning
+Prompt: "Which wells are anomalous right now? Show fleet sub-trip drift"
+Status: PASS | Latency: 5644 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Anomaly Surfacing (Early Warning)
+
+**Active Running Wells Audited**: `4 Assets` | **Anomalous Running Assets**: `0 Detected`
+
+### 1. SUB-TRIP ANOMALIES & PREDICTIVE DRIFT
+| Well ID | Anomaly Category | Live Telemetry | Warning Threshold | Deviation vs P50 |
+|---|---|---|---|---|
+| None | All Running Wells Nominal | - | - | 0% |
+
+### 2. ENGINEERING INTERPRETATION
+- **Vibration Drift (>1.4g)**: Mechanical radial bearing wear beginning to co-inflect; inspect surface desander for sand cut.
+- **Thermal Creep (>95°C)**: Motor winding heat accumulation due to heavy fluid viscosity or electrical phase imbalance.
+- **Head Decay (<1200 PSI)**: Centrifugal stage gas interference or internal impeller erosion.
+
+---
+> *Early warning anomalies surfaced by continuous P90 envelope evaluation on Server 184.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #24 [DOM1-06] - Domain 1: Surveillance / Fleet Executive Summary
+Prompt: "Generate morning executive report for the ESP fleet"
+Status: PASS | Latency: 19728 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Executive Fleet Operations Briefing
+
+**Briefing Timestamp**: `2026-10-14 19:50 UTC` | **Target**: Production Superintendent & Operations Management
+
+### 1. EXECUTIVE KPI SCORECARD
+- **Fleet Availability Ratio**: **`4/10 Wells Online`** (`40.0%`)
+- **Current Active Production**: **`1580.3 BOPD`** (Gross Liquid: `7194.4 BPD`)
+- **Deferred Production Impact**: **`742.8 BOPD Lost`** (Opportunity Cost)
+- **Top Production Bottleneck**: Well **`FS-047`** (Accounting for `109.6 BOPD` deferred)
+- **Average Fleet Mechanical Health Index**: **`74.5%`**
+
+### 2. SUPERVISORY OPERATIONAL MANDATES (Next 12 Hours)
+- **MANDATE 1**: Ensure Well FS-047 is operational by the end of the week to reduce deferred production.**
+- **MANDATE 2**: Increase active net oil production by 10% within the next two weeks.**
+- **MANDATE 3**: Monitor and address the critical offline wells to minimize their impact on overall production.**
+
+---
+> *Executive briefing generated from real-time SCADA telemetry on Server 184 and local engineering reasoning.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #25 [DOM1-07] - Domain 1: Surveillance / Fleet Asset Inventory
+Prompt: "Show fleet inventory across gathering centers"
+Status: PASS | Latency: 5442 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Real-Time Operational Status & Health Summary
+
+**Source**: PostgreSQL Live SCADA (`opg_well_telemetry`) + Trip Forensics (`events`) + Asset Registry (`asset_registry`) on Server 184
+
+### 1. LIVE FLEET OPERATIONAL STATE BREAKDOWN
+- **Currently Running / Producing**: **`4 Wells`** (40.0% of live monitored assets)
+- **Currently Tripped / Stopped**: **`6 Wells`** (60.0% downtime / offline rate)
+- **Unmonitored / Standby in SCADA**: **`0 Wells`** (Configured in asset registry; no active live SCADA stream)
+- **Total Registered Assets**: `10 Wells` across fields `FNW`, `FS`, `FWS`
+
+### 2. CURRENTLY TRIPPED WELLS & FORENSIC ROOT CAUSES (Action Required)
+| Well ID | Operating State | Primary Trip Cause | Incident Event ID | Severity | Failure Scenario |
+|---|---|---|---|---|---|
+| `FNW-001` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-20261012-103435-FNW-001-878` | `CRITICAL` | bearing_degradation |
+| `FS-013` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-TEST-f6a4b11d` | `CRITICAL` | normal |
+| `FS-016` | `TRIPPED / STOPPED` | **`UNDERLOAD_PUMP_OFF`** | `EV-20261012-071541-FS-016-838` | `CRITICAL` | dry_well_pump_off |
+| `FS-017` | `TRIPPED / STOPPED` | **`OVERLOAD_SOLIDS`** | `EV-20261012-101438-FS-017-571` | `CRITICAL` | sand_ingestion |
+| `FS-040` | `TRIPPED / STOPPED` | **`BROKEN_SHAFT_UNDERLOAD`** | `EV-20261012-101529-FS-040-950` | `CRITICAL` | broken_shaft |
+| `FS-047` | `TRIPPED / STOPPED` | **`MOTOR_OVERLOAD`** | `EV-20261012-103306-FS-047-416` | `CRITICAL` | motor_overload |
+
+### 3. CURRENTLY RUNNING WELLS (Live Nominal Telemetry)
+| Well ID | State | Operating Frequency | Motor Current | Intake Pr. (PIP) | Motor Temp | Vibration |
+|---|---|---|---|---|---|---|
+| `FS-004` | `RUNNING` | 49.5 Hz | 34.8 A | 388.3 psi | 84.5 °C | 0.179 G |
+| `FS-006` | `RUNNING` | 50.0 Hz | 32.9 A | 379.5 psi | 82.6 °C | 0.177 G |
+| `FS-023` | `RUNNING` | 49.9 Hz | 42.2 A | 419.6 psi | 90.9 °C | 0.176 G |
+| `FWS-001` | `RUNNING` | 50.1 Hz | 84.8 A | 417.6 psi | 91.8 °C | 0.178 G |
+
+### 4. OILFIELD HIERARCHY MAPPING (Field → Gathering Station → Cluster)
+**Field-Level Rollup**:
+- **Field `FS`**: `5` wells | `186.0 HP` aggregate capacity
+- **Field `Unassigned Field`**: `3` wells | `263.0 HP` aggregate capacity
+- **Field `FNW`**: `1` wells | `53.0 HP` aggregate capacity
+- **Field `FWS`**: `1` wells | `350.0 HP` aggregate capacity
+
+**Gathering Station / Cluster Allocation**:
+- **Cluster 15**: `2/2` wells active | `403.0 HP` installed power
+- **Cluster 3**: `3/3` wells active | `250.0 HP` installed power
+- **Cluster 4**: `5/5` wells active | `199.0 HP` installed power
+
+----------------------------------------------------------------------------------------------------
+QUERY #26 [DOM1-08] - Domain 1: Surveillance / Fleet Alarm Timeline (48h)
+Prompt: "Show fleet alarm timeline for the past 48 hours"
+Status: PASS | Latency: 146 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Alarm & Trip Timeline
+
+**Historical Trip Events**: `521 Events Loaded` | **Dominant Fleet Failure**: `HIGH_VIBRATION`
+
+### 1. RECENT DAILY TRIP DENSITY
+| Date (UTC) | Incident Volume | Dominant Trip Cause |
+|---|---|---|
+| `2026-10-14` | **`11 Trips`** | `HIGH_VIBRATION` |
+| `2026-10-13` | **`5 Trips`** | `HIGH_VIBRATION` |
+| `2026-10-12` | **`32 Trips`** | `HIGH_VIBRATION` |
+| `2026-10-11` | **`468 Trips`** | `MOTOR_OVERLOAD` |
+| `2026-10-10` | **`1 Trips`** | `UNDERLOAD_PUMP_OFF` |
+| `2026-10-09` | **`4 Trips`** | `OVERLOAD_SOLIDS` |
+
+### 2. INCIDENT CLUSTERING BY GATHERING STATION
+- **Cluster 4**: `483 trips` (92.7%), **Cluster 3**: `29 trips` (5.6%), **Cluster 15**: `9 trips` (1.7%)
+
+---
+> *Aggregated from 557 forensic telemetry trip records stored in Server 184.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #27 [DOM2-01] - Domain 2: Comparison & Ranking / Well-to-Well Comparison
+Prompt: "Compare well FS-017 vs FS-040"
+Status: PASS | Latency: 399 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Comparative Well Analysis: FS-017 vs FS-040
+
+**Source**: PostgreSQL Server 184 (`opg_well_telemetry`, `events`, `asset_registry`)
+
+### 1. SIDE-BY-SIDE TELEMETRY & BASELINE COMPARISON
+
+| **Operational Parameter** | **FS-017** | **FS-040** |
+|---|--- | ---|
+| **Operating State** | `STOPPED` | `STOPPED` |
+| **Cluster** | `4` | `4` |
+| **Motor Rating** | 38.0 HP (21.0A rated) | 38.0 HP (21.0A rated) |
+| **Motor Current** | 0.0 A (0.0% load) | 0.0 A (0.0% load) |
+| **Vibration (Vx)** | **0.18 g** (limit 2.0g) | **0.18 g** (limit 2.0g) |
+| **Pump Intake Pressure (PIP)** | 406.8 PSI | 414.3 PSI |
+| **Pump Discharge Pressure (PDP)** | 407.2 PSI | 414.5 PSI |
+| **Motor Temperature** | 87.2 °C | 88.4 °C |
+| **Flow Rate (Liquid)** | 0.0 BPD (77.7% WC) | 0.0 BPD (77.7% WC) |
+| **Lifetime Trip Count** | 187 trips | 286 trips |
+| **Dominant Trip Mode** | `MOTOR_OVERLOAD` | `MOTOR_OVERLOAD` |
+
+### 2. COMPARATIVE OPERATIONAL RISK ASSESSMENT
+- **Well `FS-017`** (**CRITICAL RISK**): Asset is offline (`STOPPED`). Dominant failure mode: `MOTOR_OVERLOAD`.
+- **Well `FS-040`** (**CRITICAL RISK**): Asset is offline (`STOPPED`). Dominant failure mode: `MOTOR_OVERLOAD`.
+
+### 3. RECOMMENDED SUPERVISORY ACTION
+1. Prioritize physical vibration FFT survey and electrical phase balance inspection for assets displaying VIOLATION flags.
+2. For offline assets, review historical trip signature and require Production Engineer sign-off before VSD restart.
+
+---
+> **Engineering Notice**: *Comparative surveillance evaluated across live downhole gauges and calibrated P50 protection baselines.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #28 [DOM2-02] - Domain 2: Comparison & Ranking / Well Comparison (FNW-001 vs FS-004)
+Prompt: "Compare well FNW-001 vs FS-004"
+Status: PASS | Latency: 421 ms
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Comparative Well Analysis: FNW-001 vs FS-004
+
+**Source**: PostgreSQL Server 184 (`opg_well_telemetry`, `events`, `asset_registry`)
+
+### 1. SIDE-BY-SIDE TELEMETRY & BASELINE COMPARISON
+
+| **Operational Parameter** | **FNW-001** | **FS-004** |
+|---|--- | ---|
+| **Operating State** | `STOPPED` | `RUNNING` |
+| **Cluster** | `15` | `3` |
+| **Motor Rating** | 53.0 HP (20.3A rated) | 165.0 HP (36.5A rated) |
+| **Motor Current** | 0.0 A (0.0% load) | 34.8 A (95.3% load) |
+| **Vibration (Vx)** | **0.18 g** (limit 2.0g) | **0.18 g** (limit 1.75g) |
+| **Pump Intake Pressure (PIP)** | 398.7 PSI | 387.7 PSI |
+| **Pump Discharge Pressure (PDP)** | 398.7 PSI | 1869.7 PSI |
+| **Motor Temperature** | 84.7 °C | 84.5 °C |
+| **Flow Rate (Liquid)** | 0.0 BPD (78.0% WC) | 2072.0 BPD (78.4% WC) |
+| **Lifetime Trip Count** | 9 trips | 1 trips |
+| **Dominant Trip Mode** | `HIGH_VIBRATION` | `UNDERLOAD_PUMP_OFF` |
+
+### 2. COMPARATIVE OPERATIONAL RISK ASSESSMENT
+- **Well `FNW-001`** (**CRITICAL RISK**): Asset is offline (`STOPPED`). Dominant failure mode: `HIGH_VIBRATION`.
+- **Well `FS-004`** (**NORMAL OPERATION**): Operating within normal envelopes (0.18g vibration, 95.3% electrical load).
+
+### 3. RECOMMENDED SUPERVISORY ACTION
+1. Prioritize physical vibration FFT survey and electrical phase balance inspection for assets displaying VIOLATION flags.
+2. For offline assets, review historical trip signature and require Production Engineer sign-off before VSD restart.
+
+---
+> **Engineering Notice**: *Comparative surveillance evaluated across live downhole gauges and calibrated P50 protection baselines.*
+
+----------------------------------------------------------------------------------------------------
+QUERY #29 [DOM2-03] - Domain 2: Comparison & Ranking / Cluster Comparison
+Prompt: "Compare Cluster 15 vs Cluster 4"
+Status: PASS | Latency: 10965 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Gathering Cluster Comparison: Cluster 15 (GCS-15) vs Cluster 4 (GCS-4)
+
+**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`)
+
+| Metric Dimension | Cluster 15 (GCS-15) | Cluster 4 (GCS-4) | Delta (15 vs 4) |
+|---|---|---|---|
+| **Active Availability** | `1/2 Online (50.0%)` | `1/5 Online (20.0%)` | `+30.0% Availability` |
+| **Gross Liquid Output** | `3852.6 BPD` | `499.1 BPD` | `+3353.5 BPD` |
+| **Net Oil Production** | `855.3 BOPD` | `109.7 BOPD` | `+745.6 BOPD` |
+| **Installed Motor Power** | `403.0 HP` | `199.0 HP` | `+204.0 HP` |
+| **Average Running Vibration** | `0.177 g` | `0.184 g` | `-0.007 g` |
+| **Average Motor Temp** | `91.9 °C` | `90.8 °C` | `+1.1 °C` |
+| **Historical Trip Volume** | `2 Total Trips` | `37 Total Trips` | `-35 Trips` |
+| **Dominant Trip Mode** | `HIGH_VIBRATION` | `MOTOR_OVERLOAD` | - |
+
+*(Objective comparative metrics computed directly from PostgreSQL Server 184 sensor data).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #30 [DOM2-04] - Domain 2: Comparison & Ranking / Cluster Comparison (3 vs 15)
+Prompt: "Compare Cluster 3 vs Cluster 15"
+Status: PASS | Latency: 8226 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Gathering Cluster Comparison: Cluster 3 (GCS-3) vs Cluster 15 (GCS-15)
+
+**Source**: PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`)
+
+| Metric Dimension | Cluster 3 (GCS-3) | Cluster 15 (GCS-15) | Delta (3 vs 15) |
+|---|---|---|---|
+| **Active Availability** | `2/3 Online (66.7%)` | `1/2 Online (50.0%)` | `+16.7% Availability` |
+| **Gross Liquid Output** | `2871.4 BPD` | `3817.1 BPD` | `-945.7 BPD` |
+| **Net Oil Production** | `630.7 BOPD` | `849.2 BOPD` | `-218.5 BOPD` |
+| **Installed Motor Power** | `250.0 HP` | `403.0 HP` | `-153.0 HP` |
+| **Average Running Vibration** | `0.181 g` | `0.183 g` | `-0.002 g` |
+| **Average Motor Temp** | `83.5 °C` | `91.9 °C` | `-8.4 °C` |
+| **Historical Trip Volume** | `18 Total Trips` | `2 Total Trips` | `+16 Trips` |
+| **Dominant Trip Mode** | `HIGH_VIBRATION` | `HIGH_VIBRATION` | - |
+
+*(Objective comparative metrics computed directly from PostgreSQL Server 184 sensor data).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #31 [DOM2-05] - Domain 2: Comparison & Ranking / Ambiguous Cluster HITL
+Prompt: "Compare the clusters"
+Status: PASS | Latency: 24 ms
+
+FULL RESPONSE OUTPUT:
+### [ESP APM] Operational Clarification Required
+
+Which gathering clusters would you like to compare?
+
+Select an option below or refine your query directly:
+
+----------------------------------------------------------------------------------------------------
+QUERY #32 [DOM2-06] - Domain 2: Comparison & Ranking / Historical Baseline Comparison (24h vs 7d)
+Prompt: "Compare well FS-017 past 24 hours with last 7 days"
+Status: PASS | Latency: 17 ms
+
+FULL RESPONSE OUTPUT:
+### [ESP APM] Operational Clarification Required
+
+What would you like to compare well FS-017 against?
+
+Select an option below or refine your query directly:
+
+----------------------------------------------------------------------------------------------------
+QUERY #33 [DOM2-07] - Domain 2: Comparison & Ranking / Peer Group Benchmarking
+Prompt: "Compare well FS-017 against its cluster peers"
+Status: PASS | Latency: 8769 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Cluster Peer Benchmark: Well `FS-017`
+
+**Gathering Cluster**: `Cluster 4` | **Peer Group**: `4 Peer Assets` | **Source**: PostgreSQL Server 184
+
+| Operating Metric | Well `FS-017` | Peer Group Median | Deviation vs Peers | Operating Status |
+|---|---|---|---|---|
+| **Vibration (Vx)** | `0.188 g` | `0.182 g` | `+3.3%` | `NOMINAL` |
+| **Motor Temperature** | `86.8 °C` | `89.3 °C` | `-2.8%` | `NOMINAL` |
+| **Pump Intake Pressure (PIP)** | `402.8 PSI` | `414.2 PSI` | `-2.8%` | `NOMINAL` |
+| **Pump Discharge Pressure (PDP)** | `407.2 PSI` | `416.1 PSI` | `-2.1%` | `NOMINAL` |
+| **Motor Current** | `0.0 A` | `0.0 A` | `+0.0%` | `NOMINAL` |
+| **Liquid Rate** | `0.0 BPD` | `0.0 BPD` | `+0.0%` | `NOMINAL` |
+| **Water Cut** | `77.9 %` | `77.9 %` | `+0.0%` | `NOMINAL` |
+
+*(Direct peer comparison evaluating target asset against synchronous operational cluster medians).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #34 [DOM2-08] - Domain 2: Comparison & Ranking / Trip Before/After Forensics
+Prompt: "Compare conditions before and after trip for event EV-20261012-101438-FS-017-571"
+Status: PASS | Latency: 675 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Event Telemetry Comparison: Before vs After Trip
+
+**Event ID**: `EV-20261012-101438-FS-017-571` | **Well ID**: `FS-017` | **Trip Cause**: `OVERLOAD_SOLIDS` | **Trip Timestamp**: `2026-10-12 15:44:41`
+
+| Operational Parameter | Pre-Event (2h Running Average) | Post-Event (2h Window) | Delta (Post - Pre) |
+|---|---|---|---|
+| **Motor Current** | `36.7 A` | `0.1 A` | `-36.6 A` |
+| **Vibration (Vx)** | `0.220 g` | `0.187 g` | `-0.033 g` |
+| **Pump Intake Pressure (PIP)** | `403.8 PSI` | `404.7 PSI` | `+0.9 PSI` |
+| **Pump Discharge Pressure (PDP)** | `1910.3 PSI` | `409.4 PSI` | `-1500.9 PSI` |
+| **Motor Temperature** | `87.5 °C` | `87.1 °C` | `-0.4 °C` |
+| **Gross Liquid Rate** | `498.9 BPD` | `1.0 BPD` | `-497.9 BPD` |
+
+*(Empirical downhole telemetry anchored on trip event timestamp).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #35 [DOM2-09] - Domain 2: Comparison & Ranking / Fleet Ranking by Trips
+Prompt: "Rank fleet by lifetime trips"
+Status: PASS | Latency: 10350 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Ranking: Lifetime Trips
+
+**Fleet Median Lifetime Trips**: `2 trips` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Lifetime Trips (trips) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FS-040` | Cluster 4 | **`20 trips`** | `STOPPED` | `+900.0%` |
+| #2 | `FS-013` | Cluster 3 | **`15 trips`** | `STOPPED` | `+650.0%` |
+| #3 | `FS-017` | Cluster 4 | **`14 trips`** | `STOPPED` | `+600.0%` |
+| #4 | `FS-047` | Cluster 4 | `2 trips` | `STOPPED` | `+0.0%` |
+| #5 | `FS-006` | Cluster 3 | `2 trips` | `RUNNING` | `+0.0%` |
+| #6 | `FNW-001` | Cluster 15 | `2 trips` | `STOPPED` | `+0.0%` |
+| #7 | `FS-016` | Cluster 4 | `1 trips` | `STOPPED` | `-50.0%` |
+| #8 | `FS-004` | Cluster 3 | `1 trips` | `RUNNING` | `-50.0%` |
+| #9 | `FS-023` | Cluster 4 | `0 trips` | `RUNNING` | `-100.0%` |
+| #10 | `FWS-001` | Cluster 15 | `0 trips` | `RUNNING` | `-100.0%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #36 [DOM2-10] - Domain 2: Comparison & Ranking / Fleet Ranking by Vibration
+Prompt: "Which wells have the highest vibration?"
+Status: PASS | Latency: 10227 ms
+Resolved Intent / Route: N/A
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Ranking: Vibration (Vx Peak)
+
+**Fleet Median Vibration (Vx Peak)**: `0.179 g` | **Source**: `opg_well_telemetry` on Server 184
+
+| Rank | Well ID | Cluster | Vibration (Vx Peak) (g) | Operating State | Deviation vs Median |
+|---|---|---|---|---|---|
+| #1 | `FS-047` | Cluster 4 | **`0.185 g`** | `STOPPED` | `+3.6%` |
+| #2 | `FS-017` | Cluster 4 | **`0.182 g`** | `STOPPED` | `+2.0%` |
+| #3 | `FS-040` | Cluster 4 | **`0.181 g`** | `STOPPED` | `+1.2%` |
+| #4 | `FS-013` | Cluster 3 | `0.179 g` | `STOPPED` | `+0.2%` |
+| #5 | `FS-006` | Cluster 3 | `0.179 g` | `RUNNING` | `+0.2%` |
+| #6 | `FS-016` | Cluster 4 | `0.178 g` | `STOPPED` | `-0.2%` |
+| #7 | `FNW-001` | Cluster 15 | `0.177 g` | `STOPPED` | `-0.6%` |
+| #8 | `FS-004` | Cluster 3 | `0.177 g` | `RUNNING` | `-0.8%` |
+| #9 | `FS-023` | Cluster 4 | `0.177 g` | `RUNNING` | `-0.9%` |
+| #10 | `FWS-001` | Cluster 15 | `0.173 g` | `RUNNING` | `-2.9%` |
+
+*(No speculative explanation text included, preserving pure comparative objectivity).*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #37 [DOM9-01] - Domain 9: UI Navigation / Primary Route: Working Status
+Prompt: "what is the Working Status page?"
+Status: PASS | Latency: 4053 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Well Working Status & Fault Spectrum
+
+**Route Path**: `/working-status` | **Type**: `Route` | **Source**: `[route.working_status]`
+
+The Working Status page is a real-time dashboard that provides a comprehensive overview of the well's operational status and fault spectrum. It includes a 14-fault ML classifier probability spectrum, deterministic SCADA operating envelopes, and a master-detail exception queue. This page is accessible via the `/working-status` path and is part of the ESP Insight Suite application, which is developed using the Advait ESP-PMM framework. The page is generated using the `workingStatusPanel.tsx` component, which is located in the `src/routes` directory of the ESP Insight Suite project. The backend API for this page is defined in the `esp_routes.py` file, which is located in the `cced_esp/backend/api/esp_routes.py` directory. The page also uses a WebSocket connection to receive live telemetry data from the `/api/esp/telemetry/ws` endpoint, which is handled by the `telemetryWs.ts` file.
+
+[route.working_status]
+
+---
+### Quick Navigation Actions:
+- [Open /working-status]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #38 [DOM9-02] - Domain 9: UI Navigation / Primary Route: Working Status Explanation
+Prompt: "explain the Working Status screen"
+Status: PASS | Latency: 1750 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Well Working Status & Fault Spectrum
+
+**Route Path**: `/working-status` | **Type**: `Route` | **Source**: `[route.working_status]`
+
+The Working Status screen in the ESP Insight Suite provides real-time information about the operational status of wells and their associated faults. It includes a 14-fault machine learning classifier probability spectrum, deterministic SCADA operating envelopes, and a master-detail exception queue. This comprehensive view helps users monitor the health and performance of their wells in real-time, enabling proactive maintenance and timely fault resolution.
+
+[route.working_status]
+
+---
+### Quick Navigation Actions:
+- [Open /working-status]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #39 [DOM9-03] - Domain 9: UI Navigation / Primary Route: Fleet Cockpit
+Prompt: "what is the Fleet Cockpit page?"
+Status: PASS | Latency: 2867 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] ESP Fleet Cockpit
+
+**Route Path**: `/` | **Type**: `Route` | **Source**: `[route.fleet_cockpit]`
+
+The Fleet Cockpit page is a centralized dashboard that provides real-time key performance indicators (KPIs) for the entire fleet. It includes multi-discipline asset table views and a top-10 attention queue, allowing users to monitor and manage their assets efficiently. The page is accessible through the root URL of the ESP Insight Suite application, and it is built using the `ESP Insight Suite` application workspace. The page is composed of several sub-components, including `FleetTable`, `EspWellVisual`, and `ui`, which are located in the `src/components/esp` directory. The core data hook, `useEspFleet`, is used to fetch and manage the fleet data.
+
+[route.fleet_cockpit]
+
+---
+### Quick Navigation Actions:
+- [Open /]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #40 [DOM9-04] - Domain 9: UI Navigation / Primary Route: Fleet Cockpit Location
+Prompt: "where is the fleet cockpit?"
+Status: PASS | Latency: 1644 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] ESP Fleet Cockpit
+
+**Route Path**: `/` | **Type**: `Route` | **Source**: `[route.fleet_cockpit]`
+
+The fleet cockpit is located at the root path `/` of the ESP Insight Suite. It serves as the central hub for real-time KPI metrics, multi-discipline asset table views, and a top-10 attention queue. This route is defined in the `index.tsx` file within the `src/routes` directory of the ESP Insight Suite project.
+
+[route.fleet_cockpit]
+
+---
+### Quick Navigation Actions:
+- [Open /]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #41 [DOM9-05] - Domain 9: UI Navigation / Primary Route: Well Monitor
+Prompt: "what is the Well Monitor screen?"
+Status: PASS | Latency: 1770 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Well Monitor & Downhole Detail
+
+**Route Path**: `/wells/FS-017` | **Type**: `Route` | **Source**: `[route.well_detail]`
+
+The Well Monitor screen is a single-well surveillance console that provides comprehensive information about the well. It includes a 2D downhole schematic visualizer, live H-Q pump performance curve, 4-subsystem equalizer, and wellbore depth pressure profile. This screen is accessible through the ESP Insight Suite application workspace and can be accessed by navigating to the `/wells/FS-017` path.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #42 [DOM9-06] - Domain 9: UI Navigation / Primary Route: Live Calculations
+Prompt: "what is the Live Calculations page?"
+Status: PASS | Latency: 2561 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Live Telemetry & Derived Physics Engine
+
+**Route Path**: `/live-calculations` | **Type**: `Route` | **Source**: `[route.live_calculations]`
+
+The Live Calculations page is a real-time dashboard that provides edge telemetry and derived physics calculations. It includes features such as Virtual Flow Metering (VFM), higher-order physics inspection, and a fleet KPI formula editor. This page is accessible through the `/live-calculations` path and is part of the Operations workspace. The page is supported by the FleetKpiFormulasEditor component and utilizes hooks like useFleetFormulae and useEspFleet for data retrieval and manipulation. The backend API supports GET and POST requests for live calculations and formula saving, respectively. The page also uses a WebSocket for real-time data streaming.
+
+[route.live_calculations]
+
+---
+### Quick Navigation Actions:
+- [Open /live-calculations]
+- [What is Working Status?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #43 [DOM9-07] - Domain 9: UI Navigation / Primary Route: Event Intelligence
+Prompt: "what is the Event Intelligence page?"
+Status: PASS | Latency: 1921 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Event & Incident Intelligence Forensics
+
+**Route Path**: `/events` | **Type**: `Route` | **Source**: `[route.event_intelligence]`
+
+The Event Intelligence page is a unified SCADA incident lifecycle surveillance tool. It provides live duration counters, chronological raw event audit logs, and a dedicated 7-pillar trip forensics workspace. The page is accessible via the `/events` path and includes a primary forensics component (`EventInvestigationWorkspace`) and a live rollup component (`LiveStateStrip`). The source route ID for this page is [route.event_intelligence].
+
+---
+### Quick Navigation Actions:
+- [Open /events]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #44 [DOM9-08] - Domain 9: UI Navigation / Primary Route: Reports Hub
+Prompt: "what is the Reports Hub page?"
+Status: PASS | Latency: 2267 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Operational Reports & Governance Hub
+
+**Route Path**: `/reports` | **Type**: `Route` | **Source**: `[route.reports_hub]`
+
+The Reports Hub page is a governed operational reporting hub that ensures zero-fabrication data gates. It allows users to customize reporting intervals and export reports in both Excel and CSV formats. The page also includes a historical archive tracking feature, providing users with a comprehensive view of past reports. The Reports Hub is accessible via the `/reports` path and is part of the Operations workspace. It is supported by various components such as ReportBuilder, ReportPreview, InsufficientDataView, and ReportArchive, which work together to provide a robust reporting solution.
+
+[route.reports_hub]
+
+---
+### Quick Navigation Actions:
+- [Open /reports]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #45 [DOM9-09] - Domain 9: UI Navigation / Primary Route: Scenario Simulator
+Prompt: "what is the Scenario Simulator page?"
+Status: PASS | Latency: 2606 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] What-If Scenario Simulator
+
+**Route Path**: `/custom-testing` | **Type**: `Route` | **Source**: `[route.scenario_simulator]`
+
+The Scenario Simulator page is a What-If operational scenario simulation bench that includes 14-channel telemetry controls, calibrated fault presets, dynamic pump curve feedback, and thermal reliability margins. It is accessible through the `/custom-testing` path and is part of the Operations workspace. The page utilizes various components and modules such as `PumpCurveChart.tsx`, `calc.ts`, and `fleet.ts` to provide detailed operational insights and simulations. The backend mathematical provenance is supported by lines 572, 575, 608, 675, and 2491 in `esp_routes.py`.
+
+[route.scenario_simulator]
+
+---
+### Quick Navigation Actions:
+- [Open /custom-testing]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #46 [DOM9-10] - Domain 9: UI Navigation / Navigation Index / Workspace Overview
+Prompt: "show all screens in operations workspace"
+Status: PASS | Latency: 5555 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Operations Workspace Navigation Index
+
+**Route Path**: `/` | **Type**: `Navigation` | **Source**: `[navigation.operations_workspace]`
+
+The Operations Workspace in the ADVAIT ESP-PMM platform contains several key screens designed to provide real-time operational monitoring and control for surveillance engineers, production technologists, and control room operators. These screens are crucial for managing the 10 active ESP digital twin assets across Gathering Centers GCS-03, GCS-04, and GCS-15.
+
+### Screens in Operations Workspace
+
+1. **Dashboard**
+   - **Purpose:** Provides an overview of the current operational status of all ESP assets.
+   - **Components:**
+     - **ESP Status:** Displays the operational status of each ESP asset, including operational time, pump speed, and current.
+     - **Alerts:** Highlights any critical or warning alerts for each ESP.
+     - **Performance Metrics:** Shows key performance metrics such as pump efficiency, energy consumption, and downtime.
+   - **Navigation:** Accessible from the main navigation menu.
+
+2. **ESP Details**
+   - **Purpose:** Provides detailed information about a specific ESP asset.
+   - **Components:**
+     - **Asset Overview:** Displays general information about the ESP, including its location, model, and manufacturer.
+     - **Real-Time Data:** Shows real-time data such as pump speed, current, and operational time.
+     - **Historical Data:** Provides historical data for performance metrics and alerts.
+   - **Navigation:** Accessible from the main navigation menu or by clicking on an ESP asset in the Dashboard.
+
+3. **Alert Management**
+
+[navigation.operations_workspace]
+
+---
+### Quick Navigation Actions:
+- [Open /]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #47 [DOM9-11] - Domain 9: UI Navigation / Component: 2D ESP String Visualizer
+Prompt: "where can I find the 2D ESP string visualizer?"
+Status: PASS | Latency: 1086 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] ESP 2D String Visualizer
+
+**Route Path**: `/wells/FS-017` | **Type**: `Component` | **Source**: `[route.well_detail]`
+
+The 2D ESP string visualizer can be found on the Well Monitor & Downhole Detail screen at `/wells/$wellId` and in preview mode on the ESP Fleet Cockpit at `/`.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #48 [DOM9-12] - Domain 9: UI Navigation / Component: 4-Subsystem Equalizer
+Prompt: "what does the 4-subsystem equalizer display?"
+Status: PASS | Latency: 1627 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] 4-Subsystem Equalizer
+
+**Route Path**: `/wells/FS-017` | **Type**: `Component` | **Source**: `[route.well_detail]`
+
+The 4-Subsystem Equalizer displays multi-band health meters and alarm thresholds across four core ESP subsystems: Hydraulic, Electrical, Thermal, and Mechanical. These meters provide real-time monitoring of the health and performance of the well, helping engineers identify potential issues and optimize operations. The display appears on the Well Monitor & Downhole Detail screen, allowing for easy access to the data.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #49 [DOM9-13] - Domain 9: UI Navigation / Component: Live Pump Performance Curves
+Prompt: "where are live pump performance curves?"
+Status: PASS | Latency: 1438 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Live Pump Performance Curve
+
+**Route Path**: `/wells/FS-017` | **Type**: `Component` | **Source**: `[route.well_detail]`
+
+The live pump performance curve is displayed on the Well Monitor & Downhole Detail screen. You can access this screen by navigating to the wells page and selecting the well you are interested in. The specific path to reach this screen is /wells/$wellId, where $wellId is the ID of the well you are viewing.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #50 [DOM9-14] - Domain 9: UI Navigation / Concept: 14-Fault Classifier Spectrum
+Prompt: "what is the 14-fault classifier spectrum?"
+Status: PASS | Latency: 1336 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] 14-Fault Classifier Spectrum
+
+**Route Path**: `/working-status` | **Type**: `Concept` | **Source**: `[route.working_status]`
+
+The 14-Fault Classifier Spectrum is a multi-class machine learning classification engine that continuously scores SCADA telemetry against 14 recognized ESP failure modes. It helps petroleum surveillance engineers detect developing downhole abnormalities hours or days before an electrical or mechanical trip occurs, preventing deferred production and premature equipment teardown.
+
+[route.working_status]
+
+---
+### Quick Navigation Actions:
+- [Open /working-status]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #51 [DOM9-15] - Domain 9: UI Navigation / Concept: Virtual Flow Metering (VFM)
+Prompt: "what is virtual flow metering (VFM)?"
+Status: PASS | Latency: 1508 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Virtual Flow Metering (VFM)
+
+**Route Path**: `/live-calculations` | **Type**: `Concept` | **Source**: `[route.live_calculations]`
+
+Virtual Flow Metering (VFM) is a thermodynamic and hydrodynamic mathematical framework used to calculate real-time gross liquid flow rate and water cut from pump intake/discharge differential pressures, fluid specific gravity, and motor brake horsepower. It provides continuous, well-by-well production monitoring without the need for expensive physical test separators or frequent surface well tests.
+
+[route.live_calculations]
+
+---
+### Quick Navigation Actions:
+- [Open /live-calculations]
+- [What is Working Status?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #52 [DOM9-16] - Domain 9: UI Navigation / Parametric Entity Binding (FS-017)
+Prompt: "where can I find pump curves for FS-017?"
+Status: PASS | Latency: 2139 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Live Pump Performance Curve
+
+**Route Path**: `/wells/FS-017` | **Type**: `Component` | **Source**: `[route.well_detail]`
+
+The pump curves for well FS-017 can be found on the Well Monitor & Downhole Detail screen. To access this, navigate to the Well Monitor & Downhole Detail page by entering the well ID (FS-017) in the search bar. The Live Pump Performance Curve component will display dynamic H-Q pump performance curves with affinity law speed scaling, recommended operating range bounds, continuous operating point coordinates, and upthrust/downthrust limit envelopes.
+
+[route.well_detail]
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FS-017]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #53 [DOM9-17] - Domain 9: UI Navigation / Parametric Entity Binding (FNW-001)
+Prompt: "show well detail for FNW-001"
+Status: PASS | Latency: 2425 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+# [ESP APM Navigation] Well Monitor & Downhole Detail
+
+**Route Path**: `/wells/FNW-001` | **Type**: `Route` | **Source**: `[route.well_detail]`
+
+To view the well detail for FNW-001, navigate to the following path:
+
+Path: /wells/FNW-001
+
+This route provides a single-well surveillance console that includes:
+- A 2D downhole schematic visualizer
+- Live H-Q pump performance curve
+- 4-subsystem equalizer
+- Wellbore depth pressure profile
+
+The well detail can be accessed through the ESP Insight Suite application, which is available in the Advait ESP-PMM. The source route ID for this entry is [route.well_detail].
+
+---
+### Quick Navigation Actions:
+- [Open /wells/FNW-001]
+- [What is Working Status?]
+- [Where are Live Calculations?]
+- [Go to Fleet Cockpit]
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #54 [DOM9-18] - Domain 9: UI Navigation / Out-of-Scope Navigation Fallback
+Prompt: "where is the pizza ordering screen?"
+Status: PASS | Latency: 24 ms
+Resolved Intent / Route: UI_NAVIGATION
+
+FULL RESPONSE OUTPUT:
+That's not documented in the platform guide yet.
+
+----------------------------------------------------------------------------------------------------
+QUERY #55 [DOM10-01] - Domain 10: Self-Knowledge / 10.1 Core Agent Identity
+Prompt: "who are you?"
+Status: PASS | Latency: 29 ms
+Resolved Intent / Route: 10.1 Agent Identity
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Identity & Architecture Specification
+
+**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics
+**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)
+**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`
+
+### 1. CORE SYSTEM MISSION
+I provide real-time operational surveillance, physics-grounded root cause diagnosis, and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.
+
+### 2. ARCHITECTURAL PILLARS
+- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).
+- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.
+- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.
+
+---
+> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #56 [DOM10-02] - Domain 10: Self-Knowledge / 10.1 System Identity & Version
+Prompt: "what is your system identity?"
+Status: FAIL | Latency: 1694 ms
+FAIL REASON: Verification check failed: Must report full architecture specification and database server
+
+FULL RESPONSE OUTPUT:
+I am the ESP APM Industrial Maintenance Copilot, your trusted assistant for ESP diagnostics, trip root cause analysis, fleet health surveillance, and petroleum engineering standards. How can I assist you today?
+
+----------------------------------------------------------------------------------------------------
+QUERY #57 [DOM10-03] - Domain 10: Self-Knowledge / 10.1 Agent Introduction
+Prompt: "introduce yourself and your background"
+Status: PASS | Latency: 13 ms
+Resolved Intent / Route: 10.1 Agent Identity
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Identity & Architecture Specification
+
+**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics
+**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)
+**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`
+
+### 1. CORE SYSTEM MISSION
+I provide real-time operational surveillance, physics-grounded root cause diagnosis, and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.
+
+### 2. ARCHITECTURAL PILLARS
+- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).
+- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.
+- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.
+
+---
+> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #58 [DOM10-04] - Domain 10: Self-Knowledge / 10.2 System Capabilities Catalog
+Prompt: "what are your capabilities?"
+Status: FAIL | Latency: 25 ms
+FAIL REASON: Verification check failed: Must catalog core domain capabilities
+Resolved Intent / Route: 10.2 Capability List
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Capability Manifest
+
+**System Version**: `2.4.0` | **Engine**: Hybrid Semantic & Physics Decision Engine
+
+### • Fleet Operational Surveillance (`DOMAIN_1`)
+- **Scope**: Real-time production rollups, deferred oil calculation, triage urgency matrix, executive briefings, and alarm clustering.
+- **Example Queries**: `"Show fleet inventory"`, `"Show total fleet production"`, `"Fleet triage ranking"`, `"Executive morning briefing"`
+
+### • Fleet Comparative Analytics (`DOMAIN_2`)
+- **Scope**: Multi-well comparisons, gathering cluster rollups, 24h vs baseline delta audits, peer benchmarking, event before/after telemetry, and fleet metric rankings.
+- **Example Queries**: `"Compare well FS-017 vs FS-040"`, `"Compare Cluster 15 vs Cluster 4"`, `"Show baseline comparison for FS-004"`, `"Benchmark FS-017 vs cluster peers"`, `"Rank wells by vibration"`
+
+### • Trip Root Cause Diagnostics (`EVENT_DIAGNOSTICS`)
+- **Scope**: Multi-hypothesis physics diagnosis of ESP electrical, mechanical, and hydraulic trips incorporating telemetry waveforms.
+- **Example Queries**: `"Diagnose event EV-20261012-103435-FNW-001-878"`, `"Why did well FS-017 trip?"`
+
+### • Autonomous Work Order Dispatch (`WORK_ORDERS`)
+- **Scope**: Generates emergency P1 maintenance work orders with mandatory Lockout/Tagout (LOTO) safety checklists and zero-voltage multimeter verification.
+- **Example Queries**: `"Dispatch work order for well FS-017"`
+
+### • Petroleum Engineering Knowledge Base (`PETROLEUM_RAG`)
+- **Scope**: Semantic retrieval of API RP 11S standards and troubleshooting guides for gas locking, emulsion, cavitation, and sand wear.
+- **Example Queries**: `"What causes gas locking in an ESP?"`, `"How to prevent sand abrasion?"`
+
+---
+> *All capability engines execute directly against live telemetry and asset registries without mock data.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #59 [DOM10-05] - Domain 10: Self-Knowledge / 10.2 Functional Scope
+Prompt: "what can you do?"
+Status: FAIL | Latency: 29 ms
+FAIL REASON: Verification check failed: Must list supported diagnostic and surveillance capabilities
+Resolved Intent / Route: 10.2 Capability List
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Capability Manifest
+
+**System Version**: `2.4.0` | **Engine**: Hybrid Semantic & Physics Decision Engine
+
+### • Fleet Operational Surveillance (`DOMAIN_1`)
+- **Scope**: Real-time production rollups, deferred oil calculation, triage urgency matrix, executive briefings, and alarm clustering.
+- **Example Queries**: `"Show fleet inventory"`, `"Show total fleet production"`, `"Fleet triage ranking"`, `"Executive morning briefing"`
+
+### • Fleet Comparative Analytics (`DOMAIN_2`)
+- **Scope**: Multi-well comparisons, gathering cluster rollups, 24h vs baseline delta audits, peer benchmarking, event before/after telemetry, and fleet metric rankings.
+- **Example Queries**: `"Compare well FS-017 vs FS-040"`, `"Compare Cluster 15 vs Cluster 4"`, `"Show baseline comparison for FS-004"`, `"Benchmark FS-017 vs cluster peers"`, `"Rank wells by vibration"`
+
+### • Trip Root Cause Diagnostics (`EVENT_DIAGNOSTICS`)
+- **Scope**: Multi-hypothesis physics diagnosis of ESP electrical, mechanical, and hydraulic trips incorporating telemetry waveforms.
+- **Example Queries**: `"Diagnose event EV-20261012-103435-FNW-001-878"`, `"Why did well FS-017 trip?"`
+
+### • Autonomous Work Order Dispatch (`WORK_ORDERS`)
+- **Scope**: Generates emergency P1 maintenance work orders with mandatory Lockout/Tagout (LOTO) safety checklists and zero-voltage multimeter verification.
+- **Example Queries**: `"Dispatch work order for well FS-017"`
+
+### • Petroleum Engineering Knowledge Base (`PETROLEUM_RAG`)
+- **Scope**: Semantic retrieval of API RP 11S standards and troubleshooting guides for gas locking, emulsion, cavitation, and sand wear.
+- **Example Queries**: `"What causes gas locking in an ESP?"`, `"How to prevent sand abrasion?"`
+
+---
+> *All capability engines execute directly against live telemetry and asset registries without mock data.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #60 [DOM10-06] - Domain 10: Self-Knowledge / 10.2 Core Features Overview
+Prompt: "list your core features"
+Status: FAIL | Latency: 9668 ms
+FAIL REASON: Verification check failed: Must provide comprehensive features breakdown
+
+FULL RESPONSE OUTPUT:
+Based on the provided technical references, here are the core features of the Electric Submersible Pump (ESP) system:
+
+1. **Switchboard Functionality**:
+   - **Voltage Rating**: The switchboard can handle voltages from 600 to 5,000 volts.
+   - **Enclosures**: Typically NEMA 3R, suitable for outdoor applications.
+   - **Motor Controllers**: Available models monitor motor current and incoming power supply, providing protection from pump-off, gas lock, tubing leaks, power supply problems, and shut-off operations.
+   - **Data Logging**: Higher-end motor controllers offer more elaborate protection and data logging functions.
+   - **Recording Ammeter**: Records input amperage on a circular chart for monitoring motor performance.
+
+2. **ESP Performance Monitoring**:
+   - **Flow Rate vs Head**: Displays hydraulic capability.
+   - **Horsepower**: Indicates motor load requirement.
+   - **Efficiency**: Shows the best operating zone.
+   - **Operating Point**: Represents actual production reality.
+   - **Core AI Feature**: Deviation from design, BEP (Best Efficiency Point), and ROR (Rate of Return).
+   - **Total Dynamic Head (TDH)**: Links well conditions to pump demand.
+
+3. **Fleet KPI & Production Ribbon**:
+   - **High-Visibility Metric Summary**: Provides instant situational awareness.
+   - **Core Asset Performance Indicators**: Total Active Operating Wells, Shut-In Count, Aggregate Gross Liquid Production, Estimated Oil Production Rate, Total Fleet Electrical Demand, Overall Asset Availability Percentage, and Net Deferred Production Rate.
+   - **Micro-Sparkline Visualizations**: Tracks 24-hour trends, delta percentage comparisons against 7-day
+
+----------------------------------------------------------------------------------------------------
+QUERY #61 [DOM10-07] - Domain 10: Self-Knowledge / 10.3 Operational Boundaries
+Prompt: "what are your operational boundaries?"
+Status: FAIL | Latency: 9 ms
+FAIL REASON: Verification check failed: Must explicitly define in-scope vs out-of-scope system boundaries
+Resolved Intent / Route: 10.1 Agent Identity
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Identity & Architecture Specification
+
+**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics
+**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)
+**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`
+
+### 1. CORE SYSTEM MISSION
+I provide real-time operational surveillance, physics-grounded root cause diagnosis, and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.
+
+### 2. ARCHITECTURAL PILLARS
+- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).
+- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.
+- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.
+
+---
+> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #62 [DOM10-08] - Domain 10: Self-Knowledge / 10.3 Out of Scope Disclosures
+Prompt: "what can you not do?"
+Status: FAIL | Latency: 706 ms
+FAIL REASON: Verification check failed: Must disclose actuation prohibitions and safety boundaries
+
+FULL RESPONSE OUTPUT:
+### [ESP APM] Operational Clarification Required
+
+I could not determine the exact operational or engineering intent of your query. Could you please clarify your request, or select an operational action below?
+
+Select an option below or refine your query directly:
+
+----------------------------------------------------------------------------------------------------
+QUERY #63 [DOM10-09] - Domain 10: Self-Knowledge / 10.3 What is Out of Scope
+Prompt: "what is out of scope for you?"
+Status: FAIL | Latency: 688 ms
+FAIL REASON: Verification check failed: Must detail out-of-scope boundaries
+
+FULL RESPONSE OUTPUT:
+### [ESP APM] Operational Clarification Required
+
+I could not determine the exact operational or engineering intent of your query. Could you please clarify your request, or select an operational action below?
+
+Select an option below or refine your query directly:
+
+----------------------------------------------------------------------------------------------------
+QUERY #64 [DOM10-10] - Domain 10: Self-Knowledge / 10.4 Monitored Fleet Scope
+Prompt: "what fleet do you monitor?"
+Status: FAIL | Latency: 5460 ms
+FAIL REASON: Verification check failed: Must describe the 10 active monitored Farha South assets
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Real-Time Operational Status & Health Summary
+
+**Source**: PostgreSQL Live SCADA (`opg_well_telemetry`) + Trip Forensics (`events`) + Asset Registry (`asset_registry`) on Server 184
+
+### 1. LIVE FLEET OPERATIONAL STATE BREAKDOWN
+- **Currently Running / Producing**: **`4 Wells`** (40.0% of live monitored assets)
+- **Currently Tripped / Stopped**: **`6 Wells`** (60.0% downtime / offline rate)
+- **Unmonitored / Standby in SCADA**: **`0 Wells`** (Configured in asset registry; no active live SCADA stream)
+- **Total Registered Assets**: `10 Wells` across fields `FNW`, `FS`, `FWS`
+
+### 2. CURRENTLY TRIPPED WELLS & FORENSIC ROOT CAUSES (Action Required)
+| Well ID | Operating State | Primary Trip Cause | Incident Event ID | Severity | Failure Scenario |
+|---|---|---|---|---|---|
+| `FNW-001` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-20261012-103435-FNW-001-878` | `CRITICAL` | bearing_degradation |
+| `FS-013` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-TEST-f6a4b11d` | `CRITICAL` | normal |
+| `FS-016` | `TRIPPED / STOPPED` | **`UNDERLOAD_PUMP_OFF`** | `EV-20261012-071541-FS-016-838` | `CRITICAL` | dry_well_pump_off |
+| `FS-017` | `TRIPPED / STOPPED` | **`OVERLOAD_SOLIDS`** | `EV-20261012-101438-FS-017-571` | `CRITICAL` | sand_ingestion |
+| `FS-040` | `TRIPPED / STOPPED` | **`BROKEN_SHAFT_UNDERLOAD`** | `EV-20261012-101529-FS-040-950` | `CRITICAL` | broken_shaft |
+| `FS-047` | `TRIPPED / STOPPED` | **`MOTOR_OVERLOAD`** | `EV-20261012-103306-FS-047-416` | `CRITICAL` | motor_overload |
+
+### 3. CURRENTLY RUNNING WELLS (Live Nominal Telemetry)
+| Well ID | State | Operating Frequency | Motor Current | Intake Pr. (PIP) | Motor Temp | Vibration |
+|---|---|---|---|---|---|---|
+| `FS-004` | `RUNNING` | 49.9 Hz | 34.9 A | 390.7 psi | 83.6 °C | 0.180 G |
+| `FS-006` | `RUNNING` | 50.1 Hz | 32.9 A | 380.8 psi | 83.1 °C | 0.177 G |
+| `FS-023` | `RUNNING` | 50.1 Hz | 41.9 A | 419.2 psi | 90.7 °C | 0.175 G |
+| `FWS-001` | `RUNNING` | 50.0 Hz | 84.6 A | 421.9 psi | 92.5 °C | 0.177 G |
+
+### 4. OILFIELD HIERARCHY MAPPING (Field → Gathering Station → Cluster)
+**Field-Level Rollup**:
+- **Field `FS`**: `5` wells | `186.0 HP` aggregate capacity
+- **Field `Unassigned Field`**: `3` wells | `263.0 HP` aggregate capacity
+- **Field `FNW`**: `1` wells | `53.0 HP` aggregate capacity
+- **Field `FWS`**: `1` wells | `350.0 HP` aggregate capacity
+
+**Gathering Station / Cluster Allocation**:
+- **Cluster 15**: `2/2` wells active | `403.0 HP` installed power
+- **Cluster 3**: `3/3` wells active | `250.0 HP` installed power
+- **Cluster 4**: `5/5` wells active | `199.0 HP` installed power
+
+----------------------------------------------------------------------------------------------------
+QUERY #65 [DOM10-11] - Domain 10: Self-Knowledge / 10.4 Monitored Assets List
+Prompt: "what assets are under your surveillance?"
+Status: FAIL | Latency: 7699 ms
+FAIL REASON: Verification check failed: Must list asset clusters and monitored wells
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Fleet Real-Time Operational Status & Health Summary
+
+**Source**: PostgreSQL Live SCADA (`opg_well_telemetry`) + Trip Forensics (`events`) + Asset Registry (`asset_registry`) on Server 184
+
+### 1. LIVE FLEET OPERATIONAL STATE BREAKDOWN
+- **Currently Running / Producing**: **`4 Wells`** (40.0% of live monitored assets)
+- **Currently Tripped / Stopped**: **`6 Wells`** (60.0% downtime / offline rate)
+- **Unmonitored / Standby in SCADA**: **`0 Wells`** (Configured in asset registry; no active live SCADA stream)
+- **Total Registered Assets**: `10 Wells` across fields `FNW`, `FS`, `FWS`
+
+### 2. CURRENTLY TRIPPED WELLS & FORENSIC ROOT CAUSES (Action Required)
+| Well ID | Operating State | Primary Trip Cause | Incident Event ID | Severity | Failure Scenario |
+|---|---|---|---|---|---|
+| `FNW-001` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-20261012-103435-FNW-001-878` | `CRITICAL` | bearing_degradation |
+| `FS-013` | `TRIPPED / STOPPED` | **`HIGH_VIBRATION`** | `EV-TEST-f6a4b11d` | `CRITICAL` | normal |
+| `FS-016` | `TRIPPED / STOPPED` | **`UNDERLOAD_PUMP_OFF`** | `EV-20261012-071541-FS-016-838` | `CRITICAL` | dry_well_pump_off |
+| `FS-017` | `TRIPPED / STOPPED` | **`OVERLOAD_SOLIDS`** | `EV-20261012-101438-FS-017-571` | `CRITICAL` | sand_ingestion |
+| `FS-040` | `TRIPPED / STOPPED` | **`BROKEN_SHAFT_UNDERLOAD`** | `EV-20261012-101529-FS-040-950` | `CRITICAL` | broken_shaft |
+| `FS-047` | `TRIPPED / STOPPED` | **`MOTOR_OVERLOAD`** | `EV-20261012-103306-FS-047-416` | `CRITICAL` | motor_overload |
+
+### 3. CURRENTLY RUNNING WELLS (Live Nominal Telemetry)
+| Well ID | State | Operating Frequency | Motor Current | Intake Pr. (PIP) | Motor Temp | Vibration |
+|---|---|---|---|---|---|---|
+| `FS-004` | `RUNNING` | 50.1 Hz | 34.8 A | 391.9 psi | 83.9 °C | 0.182 G |
+| `FS-006` | `RUNNING` | 49.9 Hz | 33.1 A | 378.0 psi | 83.7 °C | 0.177 G |
+| `FS-023` | `RUNNING` | 50.0 Hz | 41.7 A | 418.9 psi | 90.7 °C | 0.181 G |
+| `FWS-001` | `RUNNING` | 50.1 Hz | 84.4 A | 421.0 psi | 92.3 °C | 0.180 G |
+
+### 4. OILFIELD HIERARCHY MAPPING (Field → Gathering Station → Cluster)
+**Field-Level Rollup**:
+- **Field `FS`**: `5` wells | `186.0 HP` aggregate capacity
+- **Field `Unassigned Field`**: `3` wells | `263.0 HP` aggregate capacity
+- **Field `FNW`**: `1` wells | `53.0 HP` aggregate capacity
+- **Field `FWS`**: `1` wells | `350.0 HP` aggregate capacity
+
+**Gathering Station / Cluster Allocation**:
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #66 [DOM10-12] - Domain 10: Self-Knowledge / 10.5 Supported Tasks & Workflows
+Prompt: "what tasks do you support?"
+Status: PASS | Latency: 20 ms
+Resolved Intent / Route: 10.5 Objective List
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Supported Tasks & Operational Workflows
+
+**Purpose**: Standard Operating Procedures (SOP) supported by the Copilot engine
+
+1. **Trip Root Cause Analysis**: Automated 24h & ±2h waveform feature extraction, electrical imbalance detection, and physical fault isolation.
+2. **Daily Morning Surveillance**: Cluster-by-cluster availability rollup, gross liquid / net oil accounting, and deferred production tracking.
+3. **Fleet Operational Triage**: Automatic risk scoring and ranking of tripped assets to prioritize engineering dispatch.
+4. **Historical Baseline Integrity**: Rolling 24-hour vs 7-day prior operating baseline comparison for detecting gradual pump degradation.
+5. **Peer Group Benchmarking**: Evaluating target well parameters (PIP, PDP, Vibration, Amps) against cluster peer group medians.
+6. **Emergency Work Order Preparation**: Dispatching P1 work orders complete with mandatory Lockout/Tagout (LOTO) protocols and multimeter testing.
+7. **Petroleum Engineering Advisory**: Semantic search over API RP 11S standards and field troubleshooting manuals for operational best practices.
+
+---
+> *Each workflow can be initiated via natural language queries or targeted follow-up suggestions.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #67 [DOM10-13] - Domain 10: Self-Knowledge / 10.5 Supported Workflows Catalog
+Prompt: "list supported workflows"
+Status: FAIL | Latency: 31 ms
+FAIL REASON: Verification check failed: Must catalog standard operating procedures
+Resolved Intent / Route: 10.5 Objective List
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] Supported Tasks & Operational Workflows
+
+**Purpose**: Standard Operating Procedures (SOP) supported by the Copilot engine
+
+1. **Trip Root Cause Analysis**: Automated 24h & ±2h waveform feature extraction, electrical imbalance detection, and physical fault isolation.
+2. **Daily Morning Surveillance**: Cluster-by-cluster availability rollup, gross liquid / net oil accounting, and deferred production tracking.
+3. **Fleet Operational Triage**: Automatic risk scoring and ranking of tripped assets to prioritize engineering dispatch.
+4. **Historical Baseline Integrity**: Rolling 24-hour vs 7-day prior operating baseline comparison for detecting gradual pump degradation.
+5. **Peer Group Benchmarking**: Evaluating target well parameters (PIP, PDP, Vibration, Amps) against cluster peer group medians.
+6. **Emergency Work Order Preparation**: Dispatching P1 work orders complete with mandatory Lockout/Tagout (LOTO) protocols and multimeter testing.
+7. **Petroleum Engineering Advisory**: Semantic search over API RP 11S standards and field troubleshooting manuals for operational best practices.
+
+---
+> *Each workflow can be initiated via natural language queries or targeted follow-up suggestions.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #68 [DOM10-14] - Domain 10: Self-Knowledge / 10.6 System Limitations
+Prompt: "what are your system limitations?"
+Status: FAIL | Latency: 11 ms
+FAIL REASON: Verification check failed: Must disclose sensor coverage, sampling cadence, and safety boundaries
+Resolved Intent / Route: 10.1 Agent Identity
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Identity & Architecture Specification
+
+**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics
+**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)
+**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`
+
+### 1. CORE SYSTEM MISSION
+I provide real-time operational surveillance, physics-grounded root cause diagnosis, and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.
+
+### 2. ARCHITECTURAL PILLARS
+- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).
+- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.
+- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.
+
+---
+> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #69 [DOM10-15] - Domain 10: Self-Knowledge / 10.6 Known Constraints
+Prompt: "what are your known constraints?"
+Status: FAIL | Latency: 31 ms
+FAIL REASON: Verification check failed: Must state engineering transparency limitations
+Resolved Intent / Route: 10.1 Agent Identity
+
+FULL RESPONSE OUTPUT:
+# [ESP APM] System Identity & Architecture Specification
+
+**Role**: Autonomous Industrial AI Copilot for Electrical Submersible Pump (ESP) Surveillance & Diagnostics
+**Architecture**: Physics-informed diagnostic and comparative analytics engine connected to PostgreSQL Server 184 (`esp_apm_db`)
+**Operational Safety Badge**: `[READ-ONLY DECISION SUPPORT]`
+
+### 1. CORE SYSTEM MISSION
+I provide real-time operational surveillance, physics-grounded root cause diagnosis, and comparative fleet benchmarking for field petroleum engineers and maintenance supervisors. My analysis is anchored in high-frequency sensor telemetry, historical trip logs, and API RP 11S petroleum standards.
+
+### 2. ARCHITECTURAL PILLARS
+- **Empirical Grounding**: Every metric, ranking, and delta traces directly to PostgreSQL Server 184 (`asset_registry`, `opg_well_telemetry`, `events`).
+- **Zero Diagnostic Speculation**: Comparative and ranking domains adhere to strict mathematical objectivity.
+- **Autonomous Work Order Preparation**: Instantly converts verified trip diagnoses into safety-governed LOTO work orders.
+
+---
+> *Safety Notice: All recommendations and work orders operate in advisory decision-support mode and require authorized human engineer sign-off.*
+
+
+----------------------------------------------------------------------------------------------------
+QUERY #70 [DOM10-16] - Domain 10: Self-Knowledge / 10.6 Limitations Disclosure
+Prompt: "disclose system limitations"
+Status: PASS | Latency: 10351 ms
+
+FULL RESPONSE OUTPUT:
+### System Limitations of Electric Submersible Pumps (ESPs)
+
+#### Casing Size Limit
+- **Description:** ESPs are limited by the size of the casing they are installed in. Larger motors and pumps are not suitable for use in small casings (e.g., 4.5' or smaller). Inside 5.5' casing, performance can be reduced depending on depth and rate.
+- **Impact:** This limitation affects the maximum depth and rate at which an ESP can operate, as larger casings provide more room for the pump and motor to move freely.
+
+#### Operating Costs
+- **Description:** The operating costs of ESPs vary widely depending on the horsepower (HP) of the pump. Higher HP pumps require more energy, leading to higher energy costs.
+- **Impact:** This variability makes it crucial to choose an ESP with the appropriate horsepower for the application to minimize costs.
+
+#### Downhole Equipment
+- **Description:** ESPs require a highly reliable electric power system. The system must be able to handle changes downhole or in fluid properties, such as changes in pressure, temperature, and viscosity.
+- **Impact:** Poorly designed or poorly maintained downhole equipment can lead to system failures, including motor cooling problems, severe downthrust, and premature failure.
+
+#### Casing Size Limit
+- **Description:** The size of the casing also affects the performance of the ESP. Larger casings provide more room for the pump and motor to move freely, but they can also limit the maximum depth and rate at which the pump can operate.
+- **Impact:** This limitation affects the maximum depth and rate at which an ESP can operate, as larger casings provide more room for the pump and motor to move freely.

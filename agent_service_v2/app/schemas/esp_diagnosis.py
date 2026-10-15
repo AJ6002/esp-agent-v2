@@ -115,6 +115,7 @@ class ESPIntentEnum(str, Enum):
     SELF_FLEET_SCOPE = "SELF_FLEET_SCOPE"
     SELF_TASKS = "SELF_TASKS"
     SELF_LIMITATIONS = "SELF_LIMITATIONS"
+    UI_NAVIGATION = "UI_NAVIGATION"
     PRODUCTION = "PRODUCTION"
     KNOWLEDGE = "KNOWLEDGE"
     WORK_ORDER_DISPATCH = "WORK_ORDER_DISPATCH"
@@ -387,3 +388,39 @@ class SelfKnowledgeReport(BaseModel):
     markdown_report: str
 
 
+# =========================================================================
+# DOMAIN 9: UI / NAVIGATION / ROUTE AWARENESS SCHEMAS
+# =========================================================================
+
+class UIRouteEntry(BaseModel):
+    route_id: str
+    entry_type: str = "route"  # "route" | "navigation" | "component" | "concept"
+    title: str
+    path: str | None = None
+    workspace: str | None = None
+    summary: str
+    aliases: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    related: list[str] = Field(default_factory=list)
+    authority: str | None = None
+    last_reviewed: str | None = None
+    description: str = ""
+    parent_route_id: str | None = None
+    location: str | None = None
+    displays: str | None = None
+    means: str | None = None
+    matters: str | None = None
+
+
+class UINavigatorReport(BaseModel):
+    intent: str = "UI_NAVIGATION"
+    route_id: str
+    entry_type: str = "route"  # "route" | "component" | "concept"
+    title: str
+    path: str | None = None
+    resolved_path: str | None = None
+    summary: str
+    narrative: str
+    related_routes: list[str] = Field(default_factory=list)
+    suggested_options: list[str] = Field(default_factory=list)
+    markdown_report: str

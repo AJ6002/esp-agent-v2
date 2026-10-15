@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # LLM Gateway
     AI_ENABLED: bool = True
-    LLM_API_BASE: str = "http://192.168.1.134:8080/v1"
+    LLM_API_BASE: str = "http://192.168.1.188:8080/v1"
     LLM_API_KEY: str = "not-needed"
     LLM_MODEL: str = "Qwen2.5-Coder-3B-Instruct-Q4_K_M"
     LLM_TIMEOUT: int = 60

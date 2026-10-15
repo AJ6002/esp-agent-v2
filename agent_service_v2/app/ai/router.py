@@ -30,6 +30,7 @@ from app.services.esp_diagnosis_service import (
     get_self_fleet_scope,
     get_self_tasks,
     get_self_limitations,
+    get_ui_navigation_narrative,
     get_well_health_status,
     get_well_historical_analysis,
     get_well_production_metrics,
@@ -401,6 +402,20 @@ def ask_agent(
             "confidence": 1.0,
             "needs_clarification": False,
             "suggested_options": ["What can you do?", "What are your boundaries?", "Which wells do you know about?"],
+        }
+
+    # 3.9 UI Navigation & Platform Route Intelligence (Domain 9)
+    if route.intent == ESPIntentEnum.UI_NAVIGATION:
+        ev_match = re.search(r"(EV-[\w\-]+)", question, re.IGNORECASE)
+        event_id = ev_match.group(1) if ev_match else None
+        nav_res = get_ui_navigation_narrative(question, entity=route.entity, event_id=event_id)
+        return {
+            "intent": "UI_NAVIGATION",
+            "markdown_text": nav_res.markdown_report,
+            "structured_data": nav_res.dict(),
+            "confidence": 0.99,
+            "needs_clarification": False,
+            "suggested_options": nav_res.suggested_options,
         }
 
     # 9. Petroleum Engineering Knowledge RAG
