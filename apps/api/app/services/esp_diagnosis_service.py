@@ -5111,7 +5111,7 @@ def route_query_hybrid(
         )
 
     # Domain 12.5: Unknown Asset Refusal & Fuzzy Disambiguation
-    raw_well_mentions = re.findall(r"\bwell[\s:_-]+([A-Za-z0-9\-]+)\b", question, re.IGNORECASE)
+    raw_well_mentions = re.findall(r"\bwell[\s:_-]+([A-Za-z0-9\-]+(?:\s+\d+)?)\b", question, re.IGNORECASE)
     well_mentions = [w for w in raw_well_mentions if re.search(r"\d", w) or w.upper() in ["FS", "FNW", "FWS"]]
     code_mentions = re.findall(r"\b([A-Za-z]{2,4}[-_]?\d{1,4})\b", question)
     all_raw_candidates = list(dict.fromkeys(well_mentions + code_mentions))
