@@ -36,10 +36,10 @@ class TestDomain12SafetyRefusal(unittest.TestCase):
         self.assertGreater(sd["telemetry"].get("frequency_hz", 0), 40.0)
 
     def test_12_1_true_tripped_well_diagnosed_normally(self) -> None:
-        """12.1 Contrast: Confirmed tripped well (e.g. FS-017) proceeds to EVENT_DIAGNOSE."""
-        resp = ask_agent("Why did well FS-017 trip?")
+        """12.1 Contrast: Confirmed tripped well (e.g. FNW-001) proceeds to EVENT_DIAGNOSE."""
+        resp = ask_agent("Why did well FNW-001 trip?")
         self.assertEqual(resp["intent"], "EVENT_DIAGNOSE")
-        self.assertIn("FS-017", resp["markdown_text"])
+        self.assertIn("FNW-001", resp["markdown_text"])
         self.assertNotIn("False-Premise", resp["markdown_text"])
 
     def test_12_2_insufficient_evidence_refusal(self) -> None:
